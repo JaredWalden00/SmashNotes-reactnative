@@ -26,6 +26,9 @@ export default function App() {
     handleSignIn,
     handleSignUp,
     handleSignOut,
+    userMain,
+    isMainUpdating,
+    handleUpdateMain,
     userId,
   } = useAuth({ showStatusPopup, showServerOverloadedPopup });
 
@@ -122,6 +125,9 @@ export default function App() {
         onDeleteNote={removeNote}
         onCreateNote={openNewEditor}
         onSignOut={handleSignOut}
+        userMain={userMain}
+        isMainUpdating={isMainUpdating}
+        onUpdateMain={handleUpdateMain}
       />
 
       <NoteEditorModal

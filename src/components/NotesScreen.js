@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { GENERAL_FIGHTER_NAME, getFighterIcon } from "../data/smashFighters";
 import FighterTile from "./FighterTile";
+import MainPickerModal from "./MainPickerModal";
 import NoteItem from "./NoteItem";
 
 export default function NotesScreen({
@@ -27,7 +29,12 @@ export default function NotesScreen({
   onDeleteNote,
   onCreateNote,
   onSignOut,
+  userMain,
+  isMainUpdating,
+  onUpdateMain,
 }) {
+  const [isMainPickerOpen, setIsMainPickerOpen] = useState(false);
+
   if (!selectedCharacter) {
     return (
       <View style={styles.screen}>
@@ -35,6 +42,16 @@ export default function NotesScreen({
           <View style={styles.titleWrap}>
             <Text style={styles.appTitle}>SmashNotes</Text>
             <Text style={styles.subtitle}>Pick a fighter, then drill into general or matchup notes.</Text>
+            <View style={styles.mainRow}>
+              <Text style={styles.mainLabel}>Main: {userMain || "None"}</Text>
+              <Pressable
+                style={[styles.mainButton, isMainUpdating && styles.mainButtonDisabled]}
+                onPress={() => setIsMainPickerOpen(true)}
+                disabled={isMainUpdating}
+              >
+                <Text style={styles.mainButtonLabel}>{isMainUpdating ? "Saving..." : "Change"}</Text>
+              </Pressable>
+            </View>
           </View>
           <Pressable style={styles.signOutBtn} onPress={onSignOut}>
             <Text style={styles.signOutLabel}>Sign out</Text>
@@ -76,6 +93,17 @@ export default function NotesScreen({
           }
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+        />
+
+        <MainPickerModal
+          visible={isMainPickerOpen}
+          selectedMain={userMain}
+          isSaving={isMainUpdating}
+          onSelectMain={(fighterName) => {
+            onUpdateMain(fighterName);
+            setIsMainPickerOpen(false);
+          }}
+          onClose={() => setIsMainPickerOpen(false)}
         />
       </View>
     );
@@ -243,6 +271,31 @@ const styles = StyleSheet.create({
     marginTop: 4,
     color: "#5E6B80",
     fontSize: 14,
+  },
+  mainRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  mainLabel: {
+    color: "#20304E",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  mainButton: {
+    backgroundColor: "#FFF3EE",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+  },
+  mainButtonDisabled: {
+    opacity: 0.6,
+  },
+  mainButtonLabel: {
+    color: "#C14D22",
+    fontWeight: "800",
+    fontSize: 11,
   },
   signOutBtn: {
     backgroundColor: "#EEF1F5",

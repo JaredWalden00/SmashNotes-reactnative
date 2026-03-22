@@ -45,6 +45,8 @@ Current app runtime:
 
    - `supabase/migrations/20260322_add_smash_note_columns.sql`
    - `supabase/migrations/20260323_enable_notes_rls_policies.sql`
+   - `supabase/migrations/20260324_add_user_profiles_main_character.sql`
+   - `supabase/migrations/20260325_allow_null_main_character.sql`
 
 7. (Optional) Link to your hosted Supabase project and push migrations:
 
@@ -106,6 +108,7 @@ This prints the local Postgres URL (usually `postgresql://postgres:postgres@127.
 ## How Data Is Stored
 
 - Cloud: Notes are stored in Supabase Postgres table `public.notes`, scoped by `user_id`, with structured fields (`character`, `opponent`, `category`, `sections`).
+- Cloud: User main fighter preference is stored in `public.user_profiles.main_character` (one row per authenticated user).
 - Local: Notes are cached in AsyncStorage under a user-specific key so each account has separate offline data.
 
 ## Scripts
@@ -188,6 +191,8 @@ Notes:
 - Keep all schema changes in migration files for version control.
 - Existing migration for Smash note fields: `supabase/migrations/20260322_add_smash_note_columns.sql`.
 - Existing migration for RLS policies: `supabase/migrations/20260323_enable_notes_rls_policies.sql`.
+- Existing migration for user profile main character: `supabase/migrations/20260324_add_user_profiles_main_character.sql`.
+- Existing migration to allow no selected main: `supabase/migrations/20260325_allow_null_main_character.sql`.
 
 ## Docker (Expo Web Preview)
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 import { GENERAL_FIGHTER_NAME, SMASH_FIGHTERS, getRosterFighters } from "../data/smashFighters";
 import { deleteNoteForUser, fetchNotesForUser, upsertNoteForUser } from "../utils/cloudNotes";
@@ -13,6 +13,8 @@ import { loadNotes, saveNotes } from "../utils/storage";
 
 export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup }) {
   const [notes, setNotes] = useState([]);
+  const notesRef = useRef([]);
+  const notesOwnerIdRef = useRef(null);
   const [fighterSearch, setFighterSearch] = useState("");
   const [noteSearch, setNoteSearch] = useState("");
   const [opponentSearch, setOpponentSearch] = useState("");
@@ -30,7 +32,37 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   });
   const [isNotesLoading, setIsNotesLoading] = useState(false);
 
+  if (userId && notesOwnerIdRef.current !== userId) {
+    notesOwnerIdRef.current = userId;
+  }
+
   useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
+
+  function mergeNotesByFreshness(localNotes, remoteNotes) {
+    const byId = new Map();
+
+    [...(localNotes || []), ...(remoteNotes || [])].forEach((note) => {
+      const normalized = normalizeNote(note);
+      if (!normalized?.id) {
+        return;
+      }
+
+      const existing = byId.get(normalized.id);
+      if (!existing || (normalized.updatedAt || 0) >= (existing.updatedAt || 0)) {
+        byId.set(normalized.id, normalized);
+      }
+    });
+
+    return Array.from(byId.values()).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  }
+
+  useEffect(() => {
+    if (userId) {
+      notesOwnerIdRef.current = userId;
+    }
+
     if (!userId) {
       setNotes([]);
       setFighterSearch("");
@@ -54,11 +86,13 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         }
 
         const remote = await fetchNotesForUser(userId);
+        const merged = mergeNotesByFreshness(cached, remote);
+
         if (isMounted) {
-          setNotes(remote);
+          setNotes(merged);
         }
 
-        await saveNotes(remote, userId);
+        await saveNotes(merged, userId);
       } catch (error) {
         if (isRateLimitError(error)) {
           showServerOverloadedPopup();
@@ -248,19 +282,19 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     resetEditor();
   }
 
-  async function persistAndSync(nextNotes, changedNote, deletedNoteId) {
-    if (!userId) {
-      return;
+  async function persistAndSync(nextNotes, changedNote, deletedNoteId, targetUserId) {
+    if (!targetUserId) {
+      throw new Error("No signed-in user id available for sync.");
     }
 
-    await saveNotes(nextNotes, userId);
+    await saveNotes(nextNotes, targetUserId);
 
     if (changedNote) {
-      await upsertNoteForUser(userId, changedNote);
+      await upsertNoteForUser(targetUserId, changedNote);
     }
 
     if (deletedNoteId) {
-      await deleteNoteForUser(userId, deletedNoteId);
+      await deleteNoteForUser(targetUserId, deletedNoteId);
     }
   }
 
@@ -275,32 +309,30 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     }
 
     const now = Date.now();
-    let upsertedNote;
-    let nextNotes;
+    const currentNotes = notesRef.current;
+    const targetUserId = userId || notesOwnerIdRef.current;
+    let upsertedNote = null;
+    let nextNotes = [];
 
     if (draftId) {
-      setNotes((current) => {
-        nextNotes = current
-          .map((note) => {
-            if (note.id !== draftId) {
-              return note;
-            }
+      nextNotes = currentNotes
+        .map((note) => {
+          if (note.id !== draftId) {
+            return note;
+          }
 
-            upsertedNote = normalizeNote({
-              ...note,
-              title: buildNoteTitle(draftContext.character, draftContext.opponent, safeTitle),
-              updatedAt: now,
-              character: draftContext.character,
-              opponent: draftContext.opponent,
-              category: draftContext.category,
-              sections: nextSections,
-            });
-            return upsertedNote;
-          })
-          .sort((a, b) => b.updatedAt - a.updatedAt);
-
-        return nextNotes;
-      });
+          upsertedNote = normalizeNote({
+            ...note,
+            title: buildNoteTitle(draftContext.character, draftContext.opponent, safeTitle),
+            updatedAt: now,
+            character: draftContext.character,
+            opponent: draftContext.opponent,
+            category: draftContext.category,
+            sections: nextSections,
+          });
+          return upsertedNote;
+        })
+        .sort((a, b) => b.updatedAt - a.updatedAt);
     } else {
       upsertedNote = normalizeNote({
         id: buildId(),
@@ -312,16 +344,16 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         sections: nextSections,
       });
 
-      setNotes((current) => {
-        nextNotes = [upsertedNote, ...current].sort((a, b) => b.updatedAt - a.updatedAt);
-        return nextNotes;
-      });
+      nextNotes = [upsertedNote, ...currentNotes].sort((a, b) => b.updatedAt - a.updatedAt);
     }
+
+    notesRef.current = nextNotes;
+    setNotes(nextNotes);
 
     resetEditor();
 
     if (nextNotes && upsertedNote) {
-      persistAndSync(nextNotes, upsertedNote, null).catch((error) => {
+      persistAndSync(nextNotes, upsertedNote, null, targetUserId).catch((error) => {
         if (isRateLimitError(error)) {
           showServerOverloadedPopup();
           return;
@@ -330,7 +362,9 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         showStatusPopup(
           "error",
           "Save failed",
-          "Your note was updated locally but cloud sync failed."
+          error?.message
+            ? `Your note was updated locally but cloud sync failed: ${error.message}`
+            : "Your note was updated locally but cloud sync failed."
         );
       });
     }
@@ -343,14 +377,13 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         text: "Delete",
         style: "destructive",
         onPress: () => {
-          let nextNotes;
-          setNotes((current) => {
-            nextNotes = current.filter((note) => note.id !== noteId);
-            return nextNotes;
-          });
+          const targetUserId = userId || notesOwnerIdRef.current;
+          const nextNotes = notesRef.current.filter((note) => note.id !== noteId);
+          notesRef.current = nextNotes;
+          setNotes(nextNotes);
 
           if (nextNotes) {
-            persistAndSync(nextNotes, null, noteId).catch((error) => {
+            persistAndSync(nextNotes, null, noteId, targetUserId).catch((error) => {
               if (isRateLimitError(error)) {
                 showServerOverloadedPopup();
                 return;
@@ -359,7 +392,9 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
               showStatusPopup(
                 "error",
                 "Delete sync failed",
-                "Note was removed locally but cloud sync failed."
+                error?.message
+                  ? `Note was removed locally but cloud sync failed: ${error.message}`
+                  : "Note was removed locally but cloud sync failed."
               );
             });
           }

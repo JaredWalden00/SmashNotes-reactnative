@@ -2,7 +2,7 @@ export const GENERAL_FIGHTER_NAME = "General";
 
 export const SMASH_FIGHTERS = [
   { name: "General", icon: require("../SmashIcons/General.png") },
-  { name: "Banjo & Kazooie", icon: require("../SmashIcons/Banjo & Kazooie.png") },
+  { name: "Banjo & Kazooie", icon: require("../SmashIcons/Banjo and Kazooie.png") },
   { name: "Bayonetta", icon: require("../SmashIcons/Bayonetta.png") },
   { name: "Bowser", icon: require("../SmashIcons/Bowser.png") },
   { name: "Bowser Jr", icon: require("../SmashIcons/Bowser Jr.png") },
@@ -52,7 +52,7 @@ export const SMASH_FIGHTERS = [
   { name: "Mii Gunner", icon: require("../SmashIcons/Mii Gunner.png") },
   { name: "Mii Swordfighter", icon: require("../SmashIcons/Mii Swordfighter.png") },
   { name: "Min Min", icon: require("../SmashIcons/Min Min.png") },
-  { name: "Mr. Game & Watch", icon: require("../SmashIcons/Mr. Game & Watch.png") },
+  { name: "Mr. Game & Watch", icon: require("../SmashIcons/Mr. Game and Watch.png") },
   { name: "Mythra", icon: require("../SmashIcons/Mythra.png") },
   { name: "Ness", icon: require("../SmashIcons/Ness.png") },
   { name: "Olimar", icon: require("../SmashIcons/Olimar.png") },
@@ -69,7 +69,7 @@ export const SMASH_FIGHTERS = [
   { name: "Richter", icon: require("../SmashIcons/Richter.png") },
   { name: "Ridley", icon: require("../SmashIcons/Ridley.png") },
   { name: "Robin", icon: require("../SmashIcons/Robin.png") },
-  { name: "Rosalina & Luma", icon: require("../SmashIcons/Rosalina & Luma.png") },
+  { name: "Rosalina & Luma", icon: require("../SmashIcons/Rosalina and Luma.png") },
   { name: "Roy", icon: require("../SmashIcons/Roy.png") },
   { name: "Ryu", icon: require("../SmashIcons/Ryu.png") },
   { name: "Samus", icon: require("../SmashIcons/Samus.png") },
