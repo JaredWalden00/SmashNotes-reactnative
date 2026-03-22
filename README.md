@@ -77,6 +77,25 @@ The migrations build this table shape:
 
 RLS is enabled and restricted to the authenticated user (`auth.uid() = user_id`) by migration.
 
+## Open Local Database
+
+After running local Supabase:
+
+1. Start services:
+   npx supabase start
+
+2. Open Supabase Studio in your browser:
+   http://127.0.0.1:54323
+
+3. In Studio, go to:
+   Table Editor -> public -> notes
+
+You can also see connection details anytime with:
+
+   npx supabase status
+
+This prints the local Postgres URL (usually `postgresql://postgres:postgres@127.0.0.1:54322/postgres`) if you want to connect from a DB client (DBeaver, TablePlus, psql, etc.).
+
 ## How Data Is Stored
 
 - Cloud: Notes are stored in Supabase Postgres table `public.notes`, scoped by `user_id`, with structured fields (`character`, `opponent`, `category`, `sections`).
@@ -125,6 +144,7 @@ Use one of these ways to run the app:
    npm run start
 
    Then open in Expo Go / emulator for iOS or Android.
+   If you want to scan the React Native QR code, use this npm host run mode (not Docker web mode).
 
 ## Supabase CLI Migrations (EF-style workflow)
 
@@ -185,6 +205,7 @@ Stop Docker web preview:
 
 Notes:
 - This Docker setup is for web preview. For mobile device testing, keep using `npm run start` on host.
+- If your goal is Expo Go QR scanning, run `npm run start` on host instead of Docker.
 - Supabase local still runs separately via `npx supabase start`.
 
 ### One-command local stack (Supabase + Expo web)
@@ -200,3 +221,5 @@ Stop both together:
 Tip:
 - `dev:docker:up` uses a Windows PowerShell helper script that checks `supabase status` first, so it does not fail just because Supabase is already running.
 - `dev:docker:up` also rebuilds and force-recreates `expo-web` so Docker picks up the latest compose/script changes.
+- If Supabase fails with a container-name conflict (for example `supabase_vector_<project>` already in use), `dev:docker:up` now auto-cleans stale Supabase containers and retries once.
+- Manual fallback cleanup command: `docker rm -f $(docker ps -a --filter "label=com.supabase.cli.project=SmashNotes-reactnative" --format "{{.ID}}")`
