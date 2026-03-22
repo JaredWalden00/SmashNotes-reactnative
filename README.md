@@ -2,6 +2,11 @@
 
 A simple notes app built with React Native + Expo.
 
+Current app runtime:
+- Expo SDK 54
+- React Native 0.81
+- React 19.1
+
 ## Features
 
 - Create notes
@@ -17,19 +22,21 @@ A simple notes app built with React Native + Expo.
 1. Install dependencies:
    npm install
 
-2. Install Supabase CLI (one-time):
+2. Use a compatible Expo Go version for SDK 54 (update Expo Go on your phone if needed).
+
+3. Install Supabase CLI (one-time):
    npm install -g supabase
 
-3. Create a `.env` file in the project root:
+4. Create a `.env` file in the project root:
 
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 
-4. Initialize Supabase in this repo (one-time):
+5. Initialize Supabase in this repo (one-time):
 
    npm run db:init
 
-5. Start local Supabase and apply migrations:
+6. Start local Supabase and apply migrations:
 
    npx supabase start
    npx supabase db reset
@@ -39,19 +46,19 @@ A simple notes app built with React Native + Expo.
    - `supabase/migrations/20260322_add_smash_note_columns.sql`
    - `supabase/migrations/20260323_enable_notes_rls_policies.sql`
 
-6. (Optional) Link to your hosted Supabase project and push migrations:
+7. (Optional) Link to your hosted Supabase project and push migrations:
 
    npm run db:link
    npm run db:migrate
 
-7. Start the app (preferred: Docker one-command stack):
+8. Start the app (preferred: Docker one-command stack):
 
    Preferred:
    npm run dev:docker:up
 
    This starts local Supabase (if needed) and Expo web container together.
 
-8. Open:
+9. Open:
 
    Docker web preview:
    http://localhost:19006
