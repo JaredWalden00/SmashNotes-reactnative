@@ -1,0 +1,32 @@
+{
+  "name": "smashnotes-reactnative",
+  "version": "1.0.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "db:init": "npx supabase init",
+    "db:link": "npx supabase link",
+    "db:migration:new": "npx supabase migration new",
+    "db:migrate": "npx supabase db push",
+    "db:types": "npx supabase gen types typescript --linked --schema public"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~5.0.5",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@supabase/supabase-js": "^2.99.3",
+    "expo": "~53.0.20",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-dom": "^19.0.0",
+    "react-native": "0.79.6",
+    "react-native-url-polyfill": "^3.0.0",
+    "react-native-web": "^0.20.0"
+  },
+  "devDependencies": {
+    "supabase": "^2.83.0"
+  }
+}

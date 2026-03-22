@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "SmashNotes",
+    "slug": "smashnotes-reactnative",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F8F9FA"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F8F9FA"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
