@@ -1,0 +1,7 @@
+node_modules
+.git
+.expo
+npm-debug.log
+Dockerfile*
+docker-compose*.yml
+supabase/.temp
