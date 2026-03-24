@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
+import { Platform } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
 import { supabase } from "../lib/supabase";
 import { isRateLimitError } from "../utils/appHelpers";
+
+WebBrowser.maybeCompleteAuthSession();
 
 export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
   const [session, setSession] = useState(null);
@@ -153,6 +158,107 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setIsAuthSubmitting(true);
+
+    try {
+      const redirectTo = Linking.createURL("auth/callback");
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: Platform.OS !== "web",
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (Platform.OS === "web") {
+        return;
+      }
+
+      if (!data?.url) {
+        showStatusPopup("error", "Google sign-in failed", "Could not open Google sign-in.");
+        return;
+      }
+
+      const authResult = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+
+      if (authResult.type !== "success" || !authResult.url) {
+        if (authResult.type === "cancel") {
+          showStatusPopup("info", "Sign-in cancelled", "Google sign-in was cancelled.");
+        } else {
+          showStatusPopup("error", "Google sign-in failed", "Could not complete Google sign-in.");
+        }
+        return;
+      }
+
+      const callbackUrl = new URL(authResult.url);
+      const authCode = callbackUrl.searchParams.get("code");
+
+      if (authCode) {
+        const {
+          data: { session: exchangedSession },
+          error: exchangeError,
+        } = await supabase.auth.exchangeCodeForSession(authCode);
+
+        if (exchangeError) {
+          throw exchangeError;
+        }
+
+        if (exchangedSession) {
+          setSession(exchangedSession);
+          setPendingConfirmation(false);
+          showStatusPopup("success", "Signed in", "Welcome back. Your notes are ready.");
+          return;
+        }
+      }
+
+      const hashParams = new URLSearchParams(callbackUrl.hash.replace(/^#/, ""));
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+
+      if (accessToken && refreshToken) {
+        const {
+          data: { session: tokenSession },
+          error: tokenError,
+        } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (tokenError) {
+          throw tokenError;
+        }
+
+        if (tokenSession) {
+          setSession(tokenSession);
+          setPendingConfirmation(false);
+          showStatusPopup("success", "Signed in", "Welcome back. Your notes are ready.");
+          return;
+        }
+      }
+
+      showStatusPopup("error", "Google sign-in failed", "No session was returned from Google.");
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        showServerOverloadedPopup();
+        return;
+      }
+
+      showStatusPopup(
+        "error",
+        "Google sign-in failed",
+        error.message || "Could not sign in with Google."
+      );
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
   return {
     session,
     userId: session?.user?.id,
@@ -165,6 +271,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     pendingConfirmation,
     setPendingConfirmation,
     handleSignIn,
+    handleGoogleSignIn,
     handleSignUp,
     handleSignOut,
   };

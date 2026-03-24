@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 export default function FighterTile({
   fighter,
@@ -8,9 +8,17 @@ export default function FighterTile({
   isMain = false,
   onPress,
 }) {
+  const isDark = useColorScheme() === "dark";
+
   return (
     <Pressable
-      style={[styles.tile, compact ? styles.tileCompact : styles.tileRegular, selected && styles.tileSelected]}
+      style={[
+        styles.tile,
+        isDark && styles.tileDark,
+        compact ? styles.tileCompact : styles.tileRegular,
+        selected && styles.tileSelected,
+        selected && isDark && styles.tileSelectedDark,
+      ]}
       onPress={() => onPress(fighter.name)}
     >
       {isMain ? (
@@ -19,7 +27,7 @@ export default function FighterTile({
         </View>
       ) : null}
       <Image source={fighter.icon} style={compact ? styles.iconCompact : styles.iconRegular} />
-      <Text style={styles.name} numberOfLines={2}>
+      <Text style={[styles.name, isDark && styles.nameDark]} numberOfLines={2}>
         {fighter.name}
       </Text>
       {count ? (
@@ -41,6 +49,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
+  tileDark: {
+    backgroundColor: "#1B2333",
+    borderColor: "#2A3449",
+  },
   tileRegular: {
     width: "23%",
     minWidth: 74,
@@ -59,6 +71,9 @@ const styles = StyleSheet.create({
     borderColor: "#FF6B3D",
     backgroundColor: "#FFF3EE",
   },
+  tileSelectedDark: {
+    backgroundColor: "#3A2B22",
+  },
   iconRegular: {
     width: 52,
     height: 52,
@@ -75,6 +90,9 @@ const styles = StyleSheet.create({
     color: "#20304E",
     textAlign: "center",
     minHeight: 28,
+  },
+  nameDark: {
+    color: "#ECF2FF",
   },
   badge: {
     position: "absolute",

@@ -1,6 +1,8 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
 
 export default function StatusModal({ statusPopup, onClose }) {
+  const isDark = useColorScheme() === "dark";
+
   return (
     <Modal
       visible={statusPopup.visible}
@@ -8,10 +10,11 @@ export default function StatusModal({ statusPopup, onClose }) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.statusBackdrop}>
+      <View style={[styles.statusBackdrop, isDark && styles.statusBackdropDark]}>
         <View
           style={[
             styles.statusCard,
+            isDark && styles.statusCardDark,
             statusPopup.type === "success"
               ? styles.statusCardSuccess
               : statusPopup.type === "error"
@@ -27,11 +30,12 @@ export default function StatusModal({ statusPopup, onClose }) {
                 : statusPopup.type === "error"
                 ? styles.statusTitleError
                 : styles.statusTitleInfo,
+              isDark && statusPopup.type === "info" && styles.statusTitleInfoDark,
             ]}
           >
             {statusPopup.title}
           </Text>
-          <Text style={styles.statusMessage}>{statusPopup.message}</Text>
+          <Text style={[styles.statusMessage, isDark && styles.statusMessageDark]}>{statusPopup.message}</Text>
           <Pressable style={styles.statusButton} onPress={onClose}>
             <Text style={styles.statusButtonLabel}>OK</Text>
           </Pressable>
@@ -49,6 +53,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
   },
+  statusBackdropDark: {
+    backgroundColor: "rgba(4, 8, 18, 0.62)",
+  },
   statusCard: {
     width: "100%",
     maxWidth: 380,
@@ -56,6 +63,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     padding: 18,
     borderWidth: 1,
+  },
+  statusCardDark: {
+    backgroundColor: "#1B2333",
   },
   statusCardSuccess: {
     borderColor: "#CDEDD8",
@@ -80,9 +90,15 @@ const styles = StyleSheet.create({
   statusTitleInfo: {
     color: "#1A2B48",
   },
+  statusTitleInfoDark: {
+    color: "#ECF2FF",
+  },
   statusMessage: {
     color: "#4D5B72",
     lineHeight: 21,
+  },
+  statusMessageDark: {
+    color: "#C9D4E8",
   },
   statusButton: {
     alignSelf: "flex-end",

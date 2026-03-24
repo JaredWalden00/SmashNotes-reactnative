@@ -13,6 +13,7 @@ Current app runtime:
 - Edit existing notes
 - Delete notes
 - Email/password authentication with Supabase
+- Google sign-in with Supabase OAuth
 - Cloud sync across devices with Supabase Postgres
 - Offline cache per user with AsyncStorage
 - Search notes by title or content
@@ -31,6 +32,33 @@ Current app runtime:
 
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+### Google Sign-In Setup (Supabase + Google Cloud)
+
+To enable Google sign-in, configure both Google Cloud and Supabase:
+
+1. In Google Cloud Console:
+   - Create or select a project.
+   - Configure OAuth consent screen.
+   - Create OAuth Client ID (Web application).
+
+2. Add Authorized redirect URI in Google Cloud:
+   - `https://<your-project-ref>.supabase.co/auth/v1/callback`
+
+3. In Supabase Dashboard:
+   - Go to Authentication -> Providers -> Google.
+   - Enable Google provider.
+   - Paste Google Client ID and Client Secret.
+
+4. In Supabase Dashboard, set additional redirect URLs (Authentication -> URL Configuration):
+   - `smashnotes://auth/callback`
+   - `http://localhost:19006/auth/callback`
+   - `http://localhost:8081/auth/callback` (optional for Expo dev server)
+
+5. Native app scheme:
+   - This project uses `smashnotes` in `app.json` for native callback handling.
+
+After this setup, users can use "Continue with Google" on the auth screen.
 
 5. Initialize Supabase in this repo (one-time):
 

@@ -1,4 +1,4 @@
-import { SafeAreaView, StatusBar, StyleSheet } from "react-native";
+import { SafeAreaView, StatusBar, StyleSheet, useColorScheme } from "react-native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import AuthScreen from "./src/components/AuthScreen";
 import LoadingScreen from "./src/components/LoadingScreen";
@@ -10,6 +10,9 @@ import { useNotes } from "./src/hooks/useNotes";
 import { useStatusPopup } from "./src/hooks/useStatusPopup";
 
 export default function App() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+
   const { statusPopup, closeStatusPopup, showStatusPopup, showServerOverloadedPopup } =
     useStatusPopup();
 
@@ -24,6 +27,7 @@ export default function App() {
     pendingConfirmation,
     setPendingConfirmation,
     handleSignIn,
+    handleGoogleSignIn,
     handleSignUp,
     handleSignOut,
     userId,
@@ -77,9 +81,9 @@ export default function App() {
 
   if (!session) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <ExpoStatusBar style="dark" />
-        <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
+      <SafeAreaView style={[styles.safe, isDark && styles.safeDark]}>
+        <ExpoStatusBar style={isDark ? "light" : "dark"} />
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#101521" : "#F6F7FB"} />
         <AuthScreen
           authEmail={authEmail}
           setAuthEmail={setAuthEmail}
@@ -89,6 +93,7 @@ export default function App() {
           pendingConfirmation={pendingConfirmation}
           onBackToSignIn={() => setPendingConfirmation(false)}
           onSignIn={handleSignIn}
+          onGoogleSignIn={handleGoogleSignIn}
           onSignUp={handleSignUp}
         />
         <StatusModal statusPopup={statusPopup} onClose={closeStatusPopup} />
@@ -97,9 +102,9 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ExpoStatusBar style="dark" />
-      <StatusBar barStyle="dark-content" backgroundColor="#F6F7FB" />
+    <SafeAreaView style={[styles.safe, isDark && styles.safeDark]}>
+      <ExpoStatusBar style={isDark ? "light" : "dark"} />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={isDark ? "#101521" : "#F6F7FB"} />
 
       <NotesScreen
         isNotesLoading={isNotesLoading}
@@ -151,5 +156,8 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: "#F6F7FB",
+  },
+  safeDark: {
+    backgroundColor: "#101521",
   },
 });

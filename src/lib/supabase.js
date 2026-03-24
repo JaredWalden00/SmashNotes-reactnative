@@ -17,7 +17,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const authConfig = {
   autoRefreshToken: true,
   persistSession: true,
-  detectSessionInUrl: false,
+  detectSessionInUrl: Platform.OS === "web",
   ...(Platform.OS !== "web" && { storage: AsyncStorage }),
 };
 

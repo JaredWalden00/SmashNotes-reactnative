@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { getFighterIcon } from "../data/smashFighters";
 import { getNoteSummaryLines } from "../utils/smashNoteModel";
 
@@ -7,58 +7,59 @@ function formatDate(timestamp) {
 }
 
 export default function NoteItem({ note, onEdit, onDelete }) {
+  const isDark = useColorScheme() === "dark";
   const summaryLines = getNoteSummaryLines(note.sections);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isDark && styles.cardDark]}>
       <Pressable style={styles.contentWrap} onPress={() => onEdit(note)}>
         <View style={styles.headerRow}>
           <View style={styles.matchupWrap}>
             <Image source={getFighterIcon(note.character)} style={styles.icon} />
             {note.opponent ? (
               <>
-                <Text style={styles.versus}>vs</Text>
+                <Text style={[styles.versus, isDark && styles.versusDark]}>vs</Text>
                 <Image source={getFighterIcon(note.opponent)} style={styles.icon} />
               </>
             ) : null}
           </View>
 
           <View style={styles.titleWrap}>
-            <Text style={styles.title}>{note.title || "Untitled note"}</Text>
-            <Text style={styles.contextLabel}>
+            <Text style={[styles.title, isDark && styles.titleDark]}>{note.title || "Untitled note"}</Text>
+            <Text style={[styles.contextLabel, isDark && styles.contextLabelDark]}>
               {note.opponent ? `${note.character} vs ${note.opponent}` : `${note.character} general notes`}
             </Text>
           </View>
 
-          <View style={[styles.typeChip, note.opponent ? styles.matchupChip : styles.generalChip]}>
-            <Text style={styles.typeChipLabel}>{note.opponent ? "Matchup" : "General"}</Text>
+          <View style={[styles.typeChip, note.opponent ? styles.matchupChip : styles.generalChip, isDark && styles.typeChipDark]}>
+            <Text style={[styles.typeChipLabel, isDark && styles.typeChipLabelDark]}>{note.opponent ? "Matchup" : "General"}</Text>
           </View>
         </View>
 
         {summaryLines.length ? (
           <View style={styles.summaryWrap}>
             {summaryLines.map(([label, value]) => (
-              <Text key={label} numberOfLines={2} style={styles.body}>
-                <Text style={styles.bodyLabel}>{label}: </Text>
+                <Text key={label} numberOfLines={2} style={[styles.body, isDark && styles.bodyDark]}>
+                <Text style={[styles.bodyLabel, isDark && styles.bodyLabelDark]}>{label}: </Text>
                 {value}
               </Text>
             ))}
           </View>
         ) : (
-          <Text numberOfLines={3} style={styles.body}>
+          <Text numberOfLines={3} style={[styles.body, isDark && styles.bodyDark]}>
             No content
           </Text>
         )}
 
-        <Text style={styles.meta}>Updated {formatDate(note.updatedAt)}</Text>
+        <Text style={[styles.meta, isDark && styles.metaDark]}>Updated {formatDate(note.updatedAt)}</Text>
       </Pressable>
 
       <View style={styles.actions}>
-        <Pressable style={[styles.actionBtn, styles.editBtn]} onPress={() => onEdit(note)}>
-          <Text style={styles.actionLabel}>Edit</Text>
+        <Pressable style={[styles.actionBtn, styles.editBtn, isDark && styles.editBtnDark]} onPress={() => onEdit(note)}>
+          <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>Edit</Text>
         </Pressable>
-        <Pressable style={[styles.actionBtn, styles.deleteBtn]} onPress={() => onDelete(note.id)}>
-          <Text style={styles.actionLabel}>Delete</Text>
+        <Pressable style={[styles.actionBtn, styles.deleteBtn, isDark && styles.deleteBtnDark]} onPress={() => onDelete(note.id)}>
+          <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>Delete</Text>
         </Pressable>
       </View>
     </View>
@@ -75,6 +76,10 @@ const styles = StyleSheet.create({
     borderColor: "#E6E8EB",
     boxShadow: "0px 2px 5px rgba(0,0,0,0.06)",
     elevation: 1,
+  },
+  cardDark: {
+    backgroundColor: "#1B2333",
+    borderColor: "#2A3449",
   },
   contentWrap: {
     marginBottom: 12,
@@ -99,6 +104,9 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#6B778C",
   },
+  versusDark: {
+    color: "#A8B5CB",
+  },
   titleWrap: {
     flex: 1,
     marginRight: 8,
@@ -109,10 +117,16 @@ const styles = StyleSheet.create({
     color: "#1A2B48",
     marginBottom: 4,
   },
+  titleDark: {
+    color: "#ECF2FF",
+  },
   contextLabel: {
     fontSize: 12,
     color: "#6B778C",
     fontWeight: "600",
+  },
+  contextLabelDark: {
+    color: "#A8B5CB",
   },
   typeChip: {
     borderRadius: 999,
@@ -130,15 +144,27 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#20304E",
   },
+  typeChipDark: {
+    opacity: 0.95,
+  },
+  typeChipLabelDark: {
+    color: "#ECF2FF",
+  },
   body: {
     fontSize: 14,
     color: "#4D5B72",
     lineHeight: 20,
     marginBottom: 6,
   },
+  bodyDark: {
+    color: "#A8B5CB",
+  },
   bodyLabel: {
     fontWeight: "800",
     color: "#20304E",
+  },
+  bodyLabelDark: {
+    color: "#ECF2FF",
   },
   summaryWrap: {
     marginBottom: 6,
@@ -146,6 +172,9 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     color: "#8A95A5",
+  },
+  metaDark: {
+    color: "#95A3BB",
   },
   actions: {
     flexDirection: "row",
@@ -159,11 +188,20 @@ const styles = StyleSheet.create({
   editBtn: {
     backgroundColor: "#D5E8FF",
   },
+  editBtnDark: {
+    backgroundColor: "#2A3E5B",
+  },
   deleteBtn: {
     backgroundColor: "#FFDCE0",
+  },
+  deleteBtnDark: {
+    backgroundColor: "#4A2930",
   },
   actionLabel: {
     fontWeight: "600",
     color: "#1E2A3A",
+  },
+  actionLabelDark: {
+    color: "#ECF2FF",
   },
 });
