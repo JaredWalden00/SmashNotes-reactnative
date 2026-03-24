@@ -1,7 +1,10 @@
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { GENERAL_FIGHTER_NAME, getFighterIcon } from "../data/smashFighters";
+import { Picker } from "@react-native-picker/picker";
+import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data/smashFighters";
 import FighterTile from "./FighterTile";
 import NoteItem from "./NoteItem";
+
+const MAIN_NONE_VALUE = "__none__";
 
 export default function NotesScreen({
   isNotesLoading,
@@ -16,8 +19,11 @@ export default function NotesScreen({
   fighterNoteCounts,
   selectedCharacter,
   selectedOpponent,
+  userMainCharacter,
+  isMainSaving,
   activeTab,
   onSelectCharacter,
+  onSetMainCharacter,
   onBackToRoster,
   onSelectTab,
   onSelectOpponent,
@@ -28,6 +34,9 @@ export default function NotesScreen({
   onCreateNote,
   onSignOut,
 }) {
+  const mainOptions = getRosterFighters();
+  const mainPickerValue = userMainCharacter || MAIN_NONE_VALUE;
+
   if (!selectedCharacter) {
     return (
       <View style={styles.screen}>
@@ -35,6 +44,11 @@ export default function NotesScreen({
           <View style={styles.titleWrap}>
             <Text style={styles.appTitle}>SmashNotes</Text>
             <Text style={styles.subtitle}>Pick a fighter, then drill into general or matchup notes.</Text>
+            {userMainCharacter ? (
+              <Text style={styles.mainText}>Current main: {userMainCharacter}</Text>
+            ) : (
+              <Text style={styles.mainText}>No main selected yet.</Text>
+            )}
           </View>
           <Pressable style={styles.signOutBtn} onPress={onSignOut}>
             <Text style={styles.signOutLabel}>Sign out</Text>
@@ -47,6 +61,23 @@ export default function NotesScreen({
             <Text style={styles.syncLabel}>Syncing notebook...</Text>
           </View>
         ) : null}
+
+        <View style={styles.mainPickerBlock}>
+          <Text style={styles.mainPickerLabel}>Main Character</Text>
+          <View style={styles.mainPickerWrap}>
+            <Picker
+              selectedValue={mainPickerValue}
+              onValueChange={(value) => onSetMainCharacter(value === MAIN_NONE_VALUE ? null : value)}
+              enabled={!isMainSaving}
+              style={styles.mainPicker}
+            >
+              <Picker.Item label="No selected main" value={MAIN_NONE_VALUE} />
+              {mainOptions.map((fighter) => (
+                <Picker.Item key={fighter.name} label={fighter.name} value={fighter.name} />
+              ))}
+            </Picker>
+          </View>
+        </View>
 
         <TextInput
           style={styles.search}
@@ -65,6 +96,7 @@ export default function NotesScreen({
             <FighterTile
               fighter={item}
               count={fighterNoteCounts[item.name]}
+              isMain={item.name === userMainCharacter}
               onPress={onSelectCharacter}
             />
           )}
@@ -116,6 +148,24 @@ export default function NotesScreen({
                 : "Review general game plans or lock in matchup-specific notes."}
             </Text>
           </View>
+        </View>
+        <View style={styles.mainPickerBlockHero}>
+          <Text style={styles.mainPickerLabelHero}>Main Character</Text>
+          <View style={styles.mainPickerWrapHero}>
+            <Picker
+              selectedValue={mainPickerValue}
+              onValueChange={(value) => onSetMainCharacter(value === MAIN_NONE_VALUE ? null : value)}
+              enabled={!isMainSaving}
+              style={styles.mainPickerHero}
+              dropdownIconColor="#FFFFFF"
+            >
+              <Picker.Item label="No selected main" value={MAIN_NONE_VALUE} color="#FFFFFF" />
+              {mainOptions.map((fighter) => (
+                <Picker.Item key={fighter.name} label={fighter.name} value={fighter.name} color="#FFFFFF" />
+              ))}
+            </Picker>
+          </View>
+          {isMainSaving ? <Text style={styles.mainSavingText}>Saving main...</Text> : null}
         </View>
       </View>
 
@@ -244,6 +294,32 @@ const styles = StyleSheet.create({
     color: "#5E6B80",
     fontSize: 14,
   },
+  mainText: {
+    marginTop: 6,
+    color: "#20304E",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  mainPickerBlock: {
+    marginBottom: 12,
+  },
+  mainPickerLabel: {
+    color: "#20304E",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  mainPickerWrap: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E6E8EB",
+    overflow: "hidden",
+  },
+  mainPicker: {
+    color: "#1A2B48",
+    height: 48,
+  },
   signOutBtn: {
     backgroundColor: "#EEF1F5",
     borderRadius: 999,
@@ -298,6 +374,31 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     color: "#D7DFEA",
     lineHeight: 20,
+  },
+  mainPickerBlockHero: {
+    marginTop: 14,
+  },
+  mainPickerLabelHero: {
+    color: "#D7DFEA",
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  mainPickerWrapHero: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#4A607A",
+    backgroundColor: "#2A3C52",
+    overflow: "hidden",
+  },
+  mainPickerHero: {
+    color: "#FFFFFF",
+    height: 48,
+  },
+  mainSavingText: {
+    marginTop: 6,
+    color: "#D7DFEA",
+    fontSize: 12,
   },
   syncRow: {
     flexDirection: "row",

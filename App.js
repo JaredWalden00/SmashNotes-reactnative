@@ -41,8 +41,11 @@ export default function App() {
     fighterNoteCounts,
     selectedCharacter,
     selectedOpponent,
+    userMainCharacter,
+    isMainSaving,
     activeTab,
     selectCharacter,
+    setMainCharacter,
     goBackToRoster,
     selectTab,
     selectOpponent,
@@ -111,8 +114,11 @@ export default function App() {
         fighterNoteCounts={fighterNoteCounts}
         selectedCharacter={selectedCharacter}
         selectedOpponent={selectedOpponent}
+        userMainCharacter={userMainCharacter}
+        isMainSaving={isMainSaving}
         activeTab={activeTab}
         onSelectCharacter={selectCharacter}
+        onSetMainCharacter={setMainCharacter}
         onBackToRoster={goBackToRoster}
         onSelectTab={selectTab}
         onSelectOpponent={selectOpponent}

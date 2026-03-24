@@ -2,6 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert } from "react-native";
 import { GENERAL_FIGHTER_NAME, SMASH_FIGHTERS, getRosterFighters } from "../data/smashFighters";
 import { deleteNoteForUser, fetchNotesForUser, upsertNoteForUser } from "../utils/cloudNotes";
+import {
+  fetchMainCharacterForUser,
+  upsertMainCharacterForUser,
+} from "../utils/cloudUserProfile";
 import { buildId, isRateLimitError } from "../utils/appHelpers";
 import {
   buildNoteTitle,
@@ -18,6 +22,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   const [opponentSearch, setOpponentSearch] = useState("");
   const [selectedCharacter, setSelectedCharacter] = useState(null);
   const [selectedOpponent, setSelectedOpponent] = useState(null);
+  const [userMainCharacter, setUserMainCharacter] = useState(null);
   const [activeTab, setActiveTab] = useState("general");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [draftId, setDraftId] = useState(null);
@@ -29,6 +34,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     category: "general",
   });
   const [isNotesLoading, setIsNotesLoading] = useState(false);
+  const [isMainSaving, setIsMainSaving] = useState(false);
 
   useEffect(() => {
     if (!userId) {
@@ -38,6 +44,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
       setOpponentSearch("");
       setSelectedCharacter(null);
       setSelectedOpponent(null);
+      setUserMainCharacter(null);
       setActiveTab("general");
       return;
     }
@@ -53,9 +60,15 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
           setNotes(cached);
         }
 
-        const remote = await fetchNotesForUser(userId);
+        const [remote, mainCharacter] = await Promise.all([
+          fetchNotesForUser(userId),
+          fetchMainCharacterForUser(userId),
+        ]);
+
         if (isMounted) {
           setNotes(remote);
+          setUserMainCharacter(mainCharacter);
+          setSelectedCharacter((current) => current || mainCharacter || null);
         }
 
         await saveNotes(remote, userId);
@@ -181,6 +194,46 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setActiveTab(character === GENERAL_FIGHTER_NAME ? "general" : "general");
     setNoteSearch("");
     setOpponentSearch("");
+  }
+
+  async function setMainCharacter(character) {
+    if (!userId) {
+      return;
+    }
+
+    const normalizedMain = !character || character === GENERAL_FIGHTER_NAME ? null : character;
+
+    if (normalizedMain === userMainCharacter) {
+      return;
+    }
+
+    const previousMain = userMainCharacter;
+    setUserMainCharacter(normalizedMain);
+    setIsMainSaving(true);
+
+    try {
+      await upsertMainCharacterForUser(userId, normalizedMain);
+      if (normalizedMain) {
+        showStatusPopup("success", "Main updated", `${normalizedMain} is now your selected main.`);
+      } else {
+        showStatusPopup("success", "Main cleared", "You no longer have a selected main.");
+      }
+    } catch (error) {
+      setUserMainCharacter(previousMain);
+
+      if (isRateLimitError(error)) {
+        showServerOverloadedPopup();
+        return;
+      }
+
+      showStatusPopup(
+        "error",
+        "Main update failed",
+        "Could not save your selected main to the cloud."
+      );
+    } finally {
+      setIsMainSaving(false);
+    }
   }
 
   function goBackToRoster() {
@@ -380,8 +433,11 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     fighterNoteCounts,
     selectedCharacter,
     selectedOpponent,
+    userMainCharacter,
+    isMainSaving,
     activeTab,
     selectCharacter,
+    setMainCharacter,
     goBackToRoster,
     selectTab,
     selectOpponent,

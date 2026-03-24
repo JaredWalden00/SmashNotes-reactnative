@@ -1,11 +1,23 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
-export default function FighterTile({ fighter, count, selected = false, compact = false, onPress }) {
+export default function FighterTile({
+  fighter,
+  count,
+  selected = false,
+  compact = false,
+  isMain = false,
+  onPress,
+}) {
   return (
     <Pressable
       style={[styles.tile, compact ? styles.tileCompact : styles.tileRegular, selected && styles.tileSelected]}
       onPress={() => onPress(fighter.name)}
     >
+      {isMain ? (
+        <View style={styles.mainBadge}>
+          <Text style={styles.mainBadgeLabel}>MAIN</Text>
+        </View>
+      ) : null}
       <Image source={fighter.icon} style={compact ? styles.iconCompact : styles.iconRegular} />
       <Text style={styles.name} numberOfLines={2}>
         {fighter.name}
@@ -80,5 +92,20 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "800",
+  },
+  mainBadge: {
+    position: "absolute",
+    top: 6,
+    left: 6,
+    borderRadius: 999,
+    backgroundColor: "#2D8A51",
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+  mainBadgeLabel: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "900",
+    letterSpacing: 0.4,
   },
 });
