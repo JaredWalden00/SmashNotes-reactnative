@@ -32,6 +32,7 @@ Current app runtime:
 
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   EXPO_PUBLIC_TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
 
 ### Google Sign-In Setup (Supabase + Google Cloud)
 
@@ -59,6 +60,29 @@ To enable Google sign-in, configure both Google Cloud and Supabase:
    - This project uses `smashnotes` in `app.json` for native callback handling.
 
 After this setup, users can use "Continue with Google" on the auth screen.
+
+### Forgot Password Setup (Supabase)
+
+The app sends password reset emails with this redirect path:
+
+- `smashnotes://auth/reset-password`
+- `http://localhost:19006/auth/reset-password`
+
+Add both URLs in Supabase Dashboard:
+
+- Authentication -> URL Configuration -> Additional Redirect URLs
+
+Then users can tap "Forgot Password?" on the login screen, open the email link, and set a new password in-app.
+
+### Captcha For Sign Up (Supabase Bot Detection)
+
+Sign-up now requires captcha completion (web flow) before account creation.
+
+1. Create a Cloudflare Turnstile site key.
+2. In Supabase Dashboard, enable Bot Detection for Auth and configure Turnstile keys.
+3. Add `EXPO_PUBLIC_TURNSTILE_SITE_KEY` to `.env`.
+
+Without the site key, sign-up will show a configuration error.
 
 5. Initialize Supabase in this repo (one-time):
 

@@ -11,8 +11,14 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
   const [session, setSession] = useState(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+  const [authMode, setAuthMode] = useState("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
   useEffect(() => {
@@ -50,7 +56,22 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsPasswordRecovery(true);
+        setAuthMode("signin");
+        setIsForgotPassword(false);
+        setPendingConfirmation(false);
+        showStatusPopup("info", "Reset password", "Enter your new password to finish recovery.");
+      }
+
+      if (event === "SIGNED_OUT") {
+        setIsPasswordRecovery(false);
+        setIsForgotPassword(false);
+        setNewPassword("");
+        setConfirmNewPassword("");
+      }
+
       setSession(nextSession || null);
     });
 
@@ -81,7 +102,6 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
       if (data.session) {
         setSession(data.session);
         setPendingConfirmation(false);
-        showStatusPopup("success", "Signed in", "Welcome back. Your notes are ready.");
       }
     } catch (error) {
       if (isRateLimitError(error)) {
@@ -101,6 +121,16 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
       return;
     }
 
+    if (authPassword !== confirmPassword) {
+      showStatusPopup("error", "Passwords do not match", "Make sure both passwords are the same.");
+      return;
+    }
+
+    if (authPassword.length < 6) {
+      showStatusPopup("error", "Password too short", "Use at least 6 characters.");
+      return;
+    }
+
     setIsAuthSubmitting(true);
 
     try {
@@ -117,6 +147,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
         setSession(data.session);
         showStatusPopup("success", "Account created", "You are signed in and ready to go.");
       } else {
+        setAuthMode("signin");
         setPendingConfirmation(true);
         showStatusPopup(
           "success",
@@ -212,7 +243,6 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
         if (exchangedSession) {
           setSession(exchangedSession);
           setPendingConfirmation(false);
-          showStatusPopup("success", "Signed in", "Welcome back. Your notes are ready.");
           return;
         }
       }
@@ -237,7 +267,6 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
         if (tokenSession) {
           setSession(tokenSession);
           setPendingConfirmation(false);
-          showStatusPopup("success", "Signed in", "Welcome back. Your notes are ready.");
           return;
         }
       }
@@ -259,20 +288,152 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!authEmail.trim()) {
+      showStatusPopup("error", "Missing email", "Enter your email first, then tap Forgot Password.");
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+
+    try {
+      const redirectTo = Linking.createURL("auth/reset-password");
+      const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
+        redirectTo,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      showStatusPopup(
+        "success",
+        "Reset email sent",
+        "Check your inbox and open the password reset link."
+      );
+      setIsForgotPassword(false);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        showServerOverloadedPopup();
+        return;
+      }
+
+      showStatusPopup(
+        "error",
+        "Reset request failed",
+        error.message || "Could not send password reset email."
+      );
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
+  async function handleUpdatePassword() {
+    if (!newPassword.trim() || !confirmNewPassword.trim()) {
+      showStatusPopup("error", "Missing fields", "Enter and confirm your new password.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      showStatusPopup("error", "Passwords do not match", "Make sure both passwords are the same.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      showStatusPopup("error", "Password too short", "Use at least 6 characters.");
+      return;
+    }
+
+    setIsAuthSubmitting(true);
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setIsPasswordRecovery(false);
+      setNewPassword("");
+      setConfirmNewPassword("");
+      showStatusPopup("success", "Password updated", "Your password has been changed.");
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        showServerOverloadedPopup();
+        return;
+      }
+
+      showStatusPopup(
+        "error",
+        "Password update failed",
+        error.message || "Could not update your password."
+      );
+    } finally {
+      setIsAuthSubmitting(false);
+    }
+  }
+
+  function cancelPasswordRecovery() {
+    setIsPasswordRecovery(false);
+    setNewPassword("");
+    setConfirmNewPassword("");
+  }
+
+  function startForgotPassword() {
+    setIsForgotPassword(true);
+  }
+
+  function cancelForgotPassword() {
+    setIsForgotPassword(false);
+  }
+
+  function startSignUpMode() {
+    setAuthMode("signup");
+    setPendingConfirmation(false);
+    setIsForgotPassword(false);
+    setAuthPassword("");
+    setConfirmPassword("");
+  }
+
+  function backToSignInMode() {
+    setAuthMode("signin");
+    setIsForgotPassword(false);
+    setAuthPassword("");
+    setConfirmPassword("");
+  }
+
   return {
     session,
     userId: session?.user?.id,
     isAuthLoading,
     isAuthSubmitting,
+    authMode,
     authEmail,
     setAuthEmail,
     authPassword,
     setAuthPassword,
+    confirmPassword,
+    setConfirmPassword,
+    newPassword,
+    setNewPassword,
+    confirmNewPassword,
+    setConfirmNewPassword,
+    isPasswordRecovery,
+    isForgotPassword,
     pendingConfirmation,
     setPendingConfirmation,
     handleSignIn,
     handleGoogleSignIn,
     handleSignUp,
+    handleForgotPassword,
+    handleUpdatePassword,
+    cancelPasswordRecovery,
+    startForgotPassword,
+    cancelForgotPassword,
+    startSignUpMode,
+    backToSignInMode,
     handleSignOut,
   };
 }

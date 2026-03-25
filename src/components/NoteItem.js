@@ -6,8 +6,8 @@ function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString();
 }
 
-export default function NoteItem({ note, onEdit, onDelete }) {
-  const isDark = useColorScheme() === "dark";
+export default function NoteItem({ note, onEdit, onDelete, forceDark = false }) {
+  const isDark = forceDark || useColorScheme() === "dark";
   const summaryLines = getNoteSummaryLines(note.sections);
 
   return (
@@ -27,11 +27,18 @@ export default function NoteItem({ note, onEdit, onDelete }) {
           <View style={styles.titleWrap}>
             <Text style={[styles.title, isDark && styles.titleDark]}>{note.title || "Untitled note"}</Text>
             <Text style={[styles.contextLabel, isDark && styles.contextLabelDark]}>
-              {note.opponent ? `${note.character} vs ${note.opponent}` : `${note.character} general notes`}
+              {note.opponent ? `${note.character} vs ${note.opponent}` : `${note.character}`}
             </Text>
           </View>
 
-          <View style={[styles.typeChip, note.opponent ? styles.matchupChip : styles.generalChip, isDark && styles.typeChipDark]}>
+          <View
+            style={[
+              styles.typeChip,
+              note.opponent ? styles.matchupChip : styles.generalChip,
+              isDark && styles.typeChipDark,
+              isDark && (note.opponent ? styles.matchupChipDark : styles.generalChipDark),
+            ]}
+          >
             <Text style={[styles.typeChipLabel, isDark && styles.typeChipLabelDark]}>{note.opponent ? "Matchup" : "General"}</Text>
           </View>
         </View>
@@ -145,10 +152,18 @@ const styles = StyleSheet.create({
     color: "#20304E",
   },
   typeChipDark: {
-    opacity: 0.95,
+    borderWidth: 1,
+    borderColor: "#30405C",
+    opacity: 1,
+  },
+  generalChipDark: {
+    backgroundColor: "#20344A",
+  },
+  matchupChipDark: {
+    backgroundColor: "#3B2A30",
   },
   typeChipLabelDark: {
-    color: "#ECF2FF",
+    color: "#DCE7FF",
   },
   body: {
     fontSize: 14,

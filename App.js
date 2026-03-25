@@ -20,15 +20,31 @@ export default function App() {
     session,
     isAuthLoading,
     isAuthSubmitting,
+    authMode,
     authEmail,
     setAuthEmail,
     authPassword,
     setAuthPassword,
+    confirmPassword,
+    setConfirmPassword,
+    newPassword,
+    setNewPassword,
+    confirmNewPassword,
+    setConfirmNewPassword,
+    isPasswordRecovery,
+    isForgotPassword,
     pendingConfirmation,
     setPendingConfirmation,
     handleSignIn,
     handleGoogleSignIn,
     handleSignUp,
+    handleForgotPassword,
+    handleUpdatePassword,
+    cancelPasswordRecovery,
+    startForgotPassword,
+    cancelForgotPassword,
+    startSignUpMode,
+    backToSignInMode,
     handleSignOut,
     userId,
   } = useAuth({ showStatusPopup, showServerOverloadedPopup });
@@ -43,6 +59,7 @@ export default function App() {
     visibleFighters,
     visibleOpponents,
     fighterNoteCounts,
+    recentNotes,
     selectedCharacter,
     selectedOpponent,
     userMainCharacter,
@@ -56,14 +73,22 @@ export default function App() {
     displayedNotes,
     canCreateMatchupNote,
     editorContextLabel,
+    draftCharacter,
     isNotesLoading,
     isEditorOpen,
     draftId,
     titleInput,
     setTitleInput,
     editorSections,
+    editorSectionKeys,
     updateSection,
+    setDraftCharacter,
+    addEditorSection,
+    addCustomEditorSection,
+    removeEditorSection,
+    moveEditorSection,
     openNewEditor,
+    openQuickEditorForCharacter,
     openEditEditor,
     closeEditor,
     saveDraft,
@@ -89,12 +114,28 @@ export default function App() {
           setAuthEmail={setAuthEmail}
           authPassword={authPassword}
           setAuthPassword={setAuthPassword}
+          authMode={authMode}
+          confirmPassword={confirmPassword}
+          setConfirmPassword={setConfirmPassword}
+          newPassword={newPassword}
+          setNewPassword={setNewPassword}
+          confirmNewPassword={confirmNewPassword}
+          setConfirmNewPassword={setConfirmNewPassword}
+          isPasswordRecovery={isPasswordRecovery}
+          isForgotPassword={isForgotPassword}
           isAuthSubmitting={isAuthSubmitting}
           pendingConfirmation={pendingConfirmation}
           onBackToSignIn={() => setPendingConfirmation(false)}
           onSignIn={handleSignIn}
           onGoogleSignIn={handleGoogleSignIn}
           onSignUp={handleSignUp}
+          onStartSignUp={startSignUpMode}
+          onBackFromSignUp={backToSignInMode}
+          onStartForgotPassword={startForgotPassword}
+          onForgotPassword={handleForgotPassword}
+          onUpdatePassword={handleUpdatePassword}
+          onCancelPasswordRecovery={cancelPasswordRecovery}
+          onCancelForgotPassword={cancelForgotPassword}
         />
         <StatusModal statusPopup={statusPopup} onClose={closeStatusPopup} />
       </SafeAreaView>
@@ -117,6 +158,7 @@ export default function App() {
         visibleFighters={visibleFighters}
         visibleOpponents={visibleOpponents}
         fighterNoteCounts={fighterNoteCounts}
+        recentNotes={recentNotes}
         selectedCharacter={selectedCharacter}
         selectedOpponent={selectedOpponent}
         userMainCharacter={userMainCharacter}
@@ -132,6 +174,7 @@ export default function App() {
         onEditNote={openEditEditor}
         onDeleteNote={removeNote}
         onCreateNote={openNewEditor}
+        onQuickCreateNote={openQuickEditorForCharacter}
         onSignOut={handleSignOut}
       />
 
@@ -141,8 +184,15 @@ export default function App() {
         editorContextLabel={editorContextLabel}
         titleInput={titleInput}
         setTitleInput={setTitleInput}
+        draftCharacter={draftCharacter}
+        onChangeDraftCharacter={setDraftCharacter}
         editorSections={editorSections}
+        editorSectionKeys={editorSectionKeys}
         updateSection={updateSection}
+        onAddSection={addEditorSection}
+        onAddCustomSection={addCustomEditorSection}
+        onRemoveSection={removeEditorSection}
+        onMoveSection={moveEditorSection}
         onClose={closeEditor}
         onSave={saveDraft}
       />

@@ -1,6 +1,7 @@
 import { GENERAL_FIGHTER_NAME } from "../data/smashFighters";
 
 const STRUCTURED_BODY_PREFIX = "__SMASHNOTE__:";
+const CUSTOM_SECTION_PREFIX = "custom:";
 
 const EMPTY_SECTIONS = {
   overview: "",
@@ -11,8 +12,103 @@ const EMPTY_SECTIONS = {
   reminders: "",
 };
 
+export const NOTE_SECTION_OPTIONS = [
+  {
+    key: "overview",
+    label: "Overview",
+    placeholder: "Game plan, key habits, primary reminder",
+  },
+  {
+    key: "neutral",
+    label: "Neutral",
+    placeholder: "Spacing, buttons to respect, anti-approach plan",
+  },
+  {
+    key: "advantage",
+    label: "Advantage",
+    placeholder: "Juggles, ledgetraps, kill confirms, pressure",
+  },
+  {
+    key: "disadvantage",
+    label: "Disadvantage",
+    placeholder: "Landing mixups, panic options, what not to do",
+  },
+  {
+    key: "stageNotes",
+    label: "Stage Notes",
+    placeholder: "Good stages, bans, platform notes",
+  },
+  {
+    key: "reminders",
+    label: "Reminders",
+    placeholder: "Short tournament notes and in-set reminders",
+  },
+];
+
+const NOTE_SECTION_KEYS = NOTE_SECTION_OPTIONS.map((section) => section.key);
+const NOTE_SECTION_LOOKUP = NOTE_SECTION_OPTIONS.reduce((lookup, section) => {
+  lookup[section.key] = section;
+  return lookup;
+}, {});
+
+export function isCustomSectionKey(sectionKey) {
+  return typeof sectionKey === "string" && sectionKey.startsWith(CUSTOM_SECTION_PREFIX);
+}
+
+export function getSectionLabel(sectionKey) {
+  if (NOTE_SECTION_LOOKUP[sectionKey]) {
+    return NOTE_SECTION_LOOKUP[sectionKey].label;
+  }
+
+  if (isCustomSectionKey(sectionKey)) {
+    const customLabel = sectionKey.slice(CUSTOM_SECTION_PREFIX.length).trim();
+    return customLabel || "Custom";
+  }
+
+  return sectionKey;
+}
+
+export function getSectionPlaceholder(sectionKey) {
+  if (NOTE_SECTION_LOOKUP[sectionKey]) {
+    return NOTE_SECTION_LOOKUP[sectionKey].placeholder;
+  }
+
+  return "Add notes for this section";
+}
+
+export function createCustomSectionKey(label, existingKeys = []) {
+  const trimmedLabel = (label || "").trim();
+  if (!trimmedLabel) {
+    return null;
+  }
+
+  const used = new Set(existingKeys.map((key) => String(key).toLowerCase()));
+  let candidate = `${CUSTOM_SECTION_PREFIX}${trimmedLabel}`;
+
+  if (!used.has(candidate.toLowerCase())) {
+    return candidate;
+  }
+
+  let suffix = 2;
+  while (used.has(`${candidate} (${suffix})`.toLowerCase())) {
+    suffix += 1;
+  }
+
+  return `${candidate} (${suffix})`;
+}
+
+export function getActiveSectionKeys(seed = {}) {
+  const normalized = createEmptySections(seed);
+  const keysWithContent = Object.keys(normalized).filter((key) => {
+    const value = normalized[key];
+    return typeof value === "string" && value.trim();
+  });
+
+  return keysWithContent.length ? keysWithContent : ["overview"];
+}
+
 export function createEmptySections(seed = {}) {
-  return {
+  const normalized = {
     overview: seed.overview || "",
     neutral: seed.neutral || "",
     advantage: seed.advantage || "",
@@ -20,6 +116,20 @@ export function createEmptySections(seed = {}) {
     stageNotes: seed.stageNotes || "",
     reminders: seed.reminders || "",
   };
+
+  Object.entries(seed).forEach(([key, value]) => {
+    if (NOTE_SECTION_KEYS.includes(key)) {
+      return;
+    }
+
+    if (typeof value !== "string") {
+      return;
+    }
+
+    normalized[key] = value;
+  });
+
+  return normalized;
 }
 
 export function buildNoteTitle(character, opponent, title = "") {
@@ -33,7 +143,7 @@ export function buildNoteTitle(character, opponent, title = "") {
     return `${character} vs ${opponent}`;
   }
 
-  return character === GENERAL_FIGHTER_NAME ? "General Notes" : `${character} General`;
+  return character === GENERAL_FIGHTER_NAME ? "Notes" : `${character} notes`;
 }
 
 export function summarizeSections(sections) {
@@ -47,15 +157,11 @@ export function summarizeSections(sections) {
 
 export function getNoteSummaryLines(sections) {
   const normalizedSections = createEmptySections(sections);
+  const customKeys = Object.keys(normalizedSections).filter((key) => !NOTE_SECTION_KEYS.includes(key));
+  const orderedKeys = [...NOTE_SECTION_KEYS, ...customKeys];
 
-  return [
-    ["Overview", normalizedSections.overview],
-    ["Neutral", normalizedSections.neutral],
-    ["Advantage", normalizedSections.advantage],
-    ["Disadvantage", normalizedSections.disadvantage],
-    ["Stage Notes", normalizedSections.stageNotes],
-    ["Reminders", normalizedSections.reminders],
-  ]
+  return orderedKeys
+    .map((key) => [getSectionLabel(key), normalizedSections[key]])
     .map(([label, value]) => [label, value.trim()])
     .filter(([, value]) => Boolean(value))
     .slice(0, 3);

@@ -1,8 +1,9 @@
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
-import { Picker } from "@react-native-picker/picker";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme, useWindowDimensions } from "react-native";
 import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data/smashFighters";
 import FighterTile from "./FighterTile";
 import NoteItem from "./NoteItem";
+import SelectMenuButton from "./SelectMenuButton";
 
 const MAIN_NONE_VALUE = "__none__";
 
@@ -17,6 +18,7 @@ export default function NotesScreen({
   visibleFighters,
   visibleOpponents,
   fighterNoteCounts,
+  recentNotes,
   selectedCharacter,
   selectedOpponent,
   userMainCharacter,
@@ -32,84 +34,167 @@ export default function NotesScreen({
   onEditNote,
   onDeleteNote,
   onCreateNote,
+  onQuickCreateNote,
   onSignOut,
 }) {
   const isDark = useColorScheme() === "dark";
+  const { width } = useWindowDimensions();
+  const isWideLayout = width >= 980;
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const mainOptions = getRosterFighters();
-  const mainPickerValue = userMainCharacter || MAIN_NONE_VALUE;
+  const mainMenuOptions = [
+    { label: "No main", value: MAIN_NONE_VALUE },
+    ...mainOptions.map((fighter) => ({ label: fighter.name, value: fighter.name })),
+  ];
+  const visibleRecentNotes = recentNotes;
+
+  function handleSignOutFromMenu() {
+    setIsAccountMenuOpen(false);
+    onSignOut();
+  }
+
+  function handleMainMenuSelect(nextMain) {
+    onSetMainCharacter(nextMain === MAIN_NONE_VALUE ? null : nextMain);
+  }
 
   if (!selectedCharacter) {
-    return (
-      <View style={[styles.screen, isDark && styles.screenDark]}>
-        <View style={styles.header}>
-          <View style={styles.titleWrap}>
-            <Text style={[styles.appTitle, isDark && styles.appTitleDark]}>SmashNotes</Text>
-            <Text style={[styles.subtitle, isDark && styles.subtitleDark]}>Pick a fighter, then drill into general or matchup notes.</Text>
-            {userMainCharacter ? (
-              <Text style={[styles.mainText, isDark && styles.mainTextDark]}>Current main: {userMainCharacter}</Text>
-            ) : (
-              <Text style={[styles.mainText, isDark && styles.mainTextDark]}>No main selected yet.</Text>
-            )}
-          </View>
-          <Pressable style={[styles.signOutBtn, isDark && styles.signOutBtnDark]} onPress={onSignOut}>
-            <Text style={[styles.signOutLabel, isDark && styles.signOutLabelDark]}>Sign out</Text>
-          </Pressable>
-        </View>
+    const scheduleDays = ["Today", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"];
 
-        {isNotesLoading ? (
-          <View style={styles.syncRow}>
-            <ActivityIndicator size="small" color="#FF6B3D" />
-            <Text style={[styles.syncLabel, isDark && styles.syncLabelDark]}>Syncing notebook...</Text>
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? (
+          <View style={styles.sideRail}>
+            <Text style={styles.sideBrand}>SmashNotes</Text>
+            <Pressable style={styles.sidePrimaryNav}>
+              <Text style={styles.sidePrimaryNavLabel}>My Stuff</Text>
+            </Pressable>
+            <Pressable style={styles.sideNavItem}>
+              <Text style={styles.sideNavLabel}>Discovery</Text>
+            </Pressable>
+
+            <View style={styles.sideBottomNav}>
+              <Pressable style={styles.sideNavItem}>
+                <Text style={styles.sideNavLabel}>Search</Text>
+              </Pressable>
+              <Pressable style={styles.sideNavItem}>
+                <Text style={styles.sideNavLabel}>Chat</Text>
+              </Pressable>
+              <View style={styles.sideAccountAnchor}>
+                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
+                  <Text style={styles.sideNavLabel}>Account</Text>
+                </Pressable>
+                {isAccountMenuOpen ? (
+                  <View style={styles.accountDropdownSide}>
+                    <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
+                      <Text style={styles.accountDropdownLabel}>Sign out</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
           </View>
         ) : null}
 
-        <View style={styles.mainPickerBlock}>
-          <Text style={[styles.mainPickerLabel, isDark && styles.mainPickerLabelDark]}>Main Character</Text>
-          <View style={[styles.mainPickerWrap, isDark && styles.mainPickerWrapDark]}>
-            <Picker
-              selectedValue={mainPickerValue}
-              onValueChange={(value) => onSetMainCharacter(value === MAIN_NONE_VALUE ? null : value)}
-              enabled={!isMainSaving}
-              style={[styles.mainPicker, isDark && styles.mainPickerDark]}
-            >
-              <Picker.Item label="No selected main" value={MAIN_NONE_VALUE} />
-              {mainOptions.map((fighter) => (
-                <Picker.Item key={fighter.name} label={fighter.name} value={fighter.name} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-
-        <TextInput
-          style={[styles.search, isDark && styles.searchDark]}
-          value={fighterSearch}
-          onChangeText={setFighterSearch}
-          placeholder="Search fighters"
-          placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
-        />
-
-        <FlatList
-          data={visibleFighters}
-          keyExtractor={(item) => item.name}
-          numColumns={4}
-          columnWrapperStyle={styles.gridRow}
-          renderItem={({ item }) => (
-            <FighterTile
-              fighter={item}
-              count={fighterNoteCounts[item.name]}
-              isMain={item.name === userMainCharacter}
-              onPress={onSelectCharacter}
-            />
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyWrap}>
-              <Text style={[styles.emptyTitle, isDark && styles.emptyTitleDark]}>No fighters found</Text>
-              <Text style={[styles.emptyBody, isDark && styles.emptyBodyDark]}>Try a different search term.</Text>
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            <Text style={styles.dashboardTitle}>My Stuff</Text>
+            <View style={styles.topBarActions}>
+              <Pressable
+                style={styles.dashboardAddNoteBtn}
+                onPress={() => onQuickCreateNote(userMainCharacter || GENERAL_FIGHTER_NAME)}
+              >
+                <Text style={styles.dashboardAddNoteLabel}>+ Add note</Text>
+              </Pressable>
+              <SelectMenuButton
+                value={userMainCharacter || MAIN_NONE_VALUE}
+                options={mainMenuOptions}
+                onSelect={handleMainMenuSelect}
+                disabled={isMainSaving}
+                onToggleOpen={(isOpen) => {
+                  if (isOpen) {
+                    setIsAccountMenuOpen(false);
+                  }
+                }}
+                anchorStyle={styles.mainSwitcherAnchor}
+                buttonStyle={styles.mainSwitcherBtn}
+                labelStyle={styles.mainSwitcherLabel}
+                caretStyle={styles.mainSwitcherCaret}
+                dropdownStyle={styles.mainSwitcherDropdown}
+                listStyle={styles.mainSwitcherList}
+                itemStyle={styles.mainSwitcherItem}
+                itemActiveStyle={styles.mainSwitcherItemActive}
+                itemLabelStyle={styles.mainSwitcherItemLabel}
+              />
+              {!isWideLayout ? (
+                <View style={styles.accountMenuAnchor}>
+                  <Pressable style={styles.accountBtn} onPress={() => setIsAccountMenuOpen((current) => !current)}>
+                    <Text style={styles.accountBtnLabel}>Account</Text>
+                  </Pressable>
+                  {isAccountMenuOpen ? (
+                    <View style={styles.accountDropdown}>
+                      <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
+                        <Text style={styles.accountDropdownLabel}>Sign out</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
-          }
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-        />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+            <View style={styles.schedulePanel}>
+              <View style={styles.schedulePillRow}>
+                <View style={styles.schedulePillActive}>
+                  <Text style={styles.schedulePillActiveLabel}>Up next</Text>
+                </View>
+                <View style={styles.schedulePill}>
+                  <Text style={styles.schedulePillLabel}>Posts</Text>
+                </View>
+              </View>
+
+              <View style={styles.scheduleGrid}>
+                {scheduleDays.map((day, index) => (
+                  <View key={day} style={styles.scheduleCol}>
+                    <Text style={[styles.scheduleDayLabel, index === 0 && styles.scheduleDayLabelActive]}>{day}</Text>
+                    <View style={[styles.scheduleCell, index === 0 && styles.scheduleCellActive]}>
+                      <Text style={styles.scheduleDate}>{24 + index}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.dashboardCard}>
+              <View style={styles.dashboardCardHeader}>
+                <Text style={styles.dashboardCardTitle}>Recent Notes</Text>
+                <Text style={styles.dashboardCardMeta}>
+                  {visibleRecentNotes.length} shown
+                </Text>
+              </View>
+
+              {isNotesLoading ? (
+                <View style={styles.syncRow}>
+                  <ActivityIndicator size="small" color="#FF6B3D" />
+                  <Text style={[styles.syncLabel, styles.syncLabelDark]}>Syncing notebook...</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.recentNotesWrap}>
+                {visibleRecentNotes.map((note) => (
+                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} forceDark />
+                ))}
+              </View>
+
+              {!visibleRecentNotes.length ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.emptyTitle, styles.emptyTitleDark]}>No recent notes found</Text>
+                  <Text style={[styles.emptyBody, styles.emptyBodyDark]}>Create a note or adjust your search.</Text>
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
+        </View>
       </View>
     );
   }
@@ -127,9 +212,21 @@ export default function NotesScreen({
         <Pressable style={[styles.backBtn, isDark && styles.backBtnDark]} onPress={onBackToRoster}>
           <Text style={styles.backBtnLabel}>Back</Text>
         </Pressable>
-        <Pressable style={[styles.signOutBtn, isDark && styles.signOutBtnDark]} onPress={onSignOut}>
-          <Text style={[styles.signOutLabel, isDark && styles.signOutLabelDark]}>Sign out</Text>
-        </Pressable>
+        <View style={styles.accountMenuAnchorCharacter}>
+          <Pressable
+            style={[styles.accountBtn, styles.accountBtnCharacter]}
+            onPress={() => setIsAccountMenuOpen((current) => !current)}
+          >
+            <Text style={styles.accountBtnLabel}>Account</Text>
+          </Pressable>
+          {isAccountMenuOpen ? (
+            <View style={styles.accountDropdownCharacter}>
+              <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
+                <Text style={styles.accountDropdownLabel}>Sign out</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <View style={styles.heroCard}>
@@ -152,20 +249,27 @@ export default function NotesScreen({
         </View>
         <View style={styles.mainPickerBlockHero}>
           <Text style={styles.mainPickerLabelHero}>Main Character</Text>
-          <View style={styles.mainPickerWrapHero}>
-            <Picker
-              selectedValue={mainPickerValue}
-              onValueChange={(value) => onSetMainCharacter(value === MAIN_NONE_VALUE ? null : value)}
-              enabled={!isMainSaving}
-              style={styles.mainPickerHero}
-              dropdownIconColor="#FFFFFF"
-            >
-              <Picker.Item label="No selected main" value={MAIN_NONE_VALUE} color="#FFFFFF" />
-              {mainOptions.map((fighter) => (
-                <Picker.Item key={fighter.name} label={fighter.name} value={fighter.name} color="#FFFFFF" />
-              ))}
-            </Picker>
-          </View>
+          <SelectMenuButton
+            value={userMainCharacter || MAIN_NONE_VALUE}
+            options={mainMenuOptions}
+            onSelect={handleMainMenuSelect}
+            disabled={isMainSaving}
+            onToggleOpen={(isOpen) => {
+              if (isOpen) {
+                setIsAccountMenuOpen(false);
+              }
+            }}
+            anchorStyle={styles.mainMenuAnchorHero}
+            buttonStyle={styles.mainHeroButton}
+            labelStyle={styles.mainHeroButtonLabel}
+            caretStyle={styles.mainHeroButtonCaret}
+            dropdownStyle={styles.mainHeroDropdown}
+            listStyle={styles.mainHeroList}
+            itemStyle={styles.mainHeroItem}
+            itemActiveStyle={styles.mainHeroItemActive}
+            itemLabelStyle={styles.mainHeroItemLabel}
+            maxListHeight={198}
+          />
           {isMainSaving ? <Text style={styles.mainSavingText}>Saving main...</Text> : null}
         </View>
       </View>
@@ -250,7 +354,7 @@ export default function NotesScreen({
                 <Text style={[styles.emptyBody, isDark && styles.emptyBodyDark]}>
                   {showingMatchups
                     ? "Start a matchup notebook for this pairing."
-                    : "Add a general note for this fighter."}
+                    : "Add a note for this fighter."}
                 </Text>
               </View>
             )}
@@ -269,6 +373,352 @@ export default function NotesScreen({
 }
 
 const styles = StyleSheet.create({
+  dashboardShell: {
+    flex: 1,
+    flexDirection: "row",
+    backgroundColor: "#060913",
+  },
+  dashboardShellDark: {
+    backgroundColor: "#060913",
+  },
+  sideRail: {
+    width: 150,
+    paddingTop: 16,
+    paddingHorizontal: 10,
+    borderRightWidth: 1,
+    borderRightColor: "#141C2E",
+  },
+  sideBrand: {
+    color: "#F3F6FF",
+    fontWeight: "900",
+    marginBottom: 16,
+    paddingHorizontal: 6,
+    fontSize: 14,
+  },
+  sidePrimaryNav: {
+    backgroundColor: "#1B2338",
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+  sidePrimaryNavLabel: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  sideNavItem: {
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  sideNavLabel: {
+    color: "#96A3BD",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  sideBottomNav: {
+    marginTop: "auto",
+    marginBottom: 10,
+  },
+  dashboardMain: {
+    flex: 1,
+  },
+  dashboardTopBar: {
+    position: "relative",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#141C2E",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    zIndex: 100,
+    elevation: 100,
+  },
+  dashboardTitle: {
+    color: "#F0F4FF",
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  topBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  dashboardSearch: {
+    minWidth: 210,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#242E47",
+    backgroundColor: "#0F1628",
+    color: "#ECF2FF",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 12,
+  },
+  dashboardAddNoteBtn: {
+    borderRadius: 8,
+    backgroundColor: "#2A4D9B",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dashboardAddNoteLabel: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  mainSwitcherAnchor: {
+    position: "relative",
+    minWidth: 180,
+    zIndex: 400,
+  },
+  mainSwitcherBtn: {
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#2C3855",
+    backgroundColor: "#111A2D",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  mainSwitcherLabel: {
+    color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+    flex: 1,
+  },
+  mainSwitcherCaret: {
+    color: "#9FB0CF",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mainSwitcherDropdown: {
+    position: "absolute",
+    top: 44,
+    right: 0,
+    minWidth: 220,
+    maxWidth: 260,
+    maxHeight: 260,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2D3957",
+    backgroundColor: "#10192C",
+    zIndex: 9999,
+    elevation: 9999,
+    paddingVertical: 6,
+  },
+  mainSwitcherList: {
+    maxHeight: 220,
+  },
+  mainSwitcherItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  mainSwitcherItemActive: {
+    backgroundColor: "#1A2540",
+  },
+  mainSwitcherItemLabel: {
+    color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  accountMenuAnchor: {
+    position: "relative",
+    zIndex: 120,
+  },
+  accountMenuAnchorCharacter: {
+    position: "relative",
+    zIndex: 120,
+  },
+  sideAccountAnchor: {
+    position: "relative",
+  },
+  accountBtn: {
+    borderRadius: 8,
+    backgroundColor: "#1F2840",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  accountBtnCharacter: {
+    backgroundColor: "#273348",
+  },
+  accountBtnLabel: {
+    color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  accountDropdown: {
+    position: "absolute",
+    top: 42,
+    right: 0,
+    minWidth: 140,
+    backgroundColor: "#10192C",
+    borderColor: "#2D3957",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 6,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountDropdownCharacter: {
+    position: "absolute",
+    top: 42,
+    right: 0,
+    minWidth: 140,
+    backgroundColor: "#1B2333",
+    borderColor: "#2A3449",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 6,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountDropdownSide: {
+    position: "absolute",
+    bottom: 44,
+    left: 0,
+    minWidth: 130,
+    backgroundColor: "#10192C",
+    borderColor: "#2D3957",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 6,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountDropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  accountDropdownLabel: {
+    color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  dashboardSignOutBtn: {
+    borderRadius: 8,
+    backgroundColor: "#1F2840",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  dashboardSignOutLabel: {
+    color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  dashboardContent: {
+    padding: 16,
+    paddingBottom: 30,
+  },
+  schedulePanel: {
+    borderWidth: 1,
+    borderColor: "#1A2438",
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: "#070C18",
+    marginBottom: 12,
+  },
+  schedulePillRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  schedulePillActive: {
+    backgroundColor: "#F6F8FD",
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  schedulePillActiveLabel: {
+    color: "#111828",
+    fontWeight: "900",
+    fontSize: 12,
+  },
+  schedulePill: {
+    borderRadius: 999,
+    backgroundColor: "#151C2E",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  schedulePillLabel: {
+    color: "#9DA8BF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  scheduleGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  scheduleCol: {
+    width: 102,
+  },
+  scheduleDayLabel: {
+    color: "#8B98B0",
+    fontSize: 11,
+    marginBottom: 5,
+  },
+  scheduleDayLabelActive: {
+    color: "#F6F8FD",
+    fontWeight: "700",
+  },
+  scheduleCell: {
+    height: 84,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#242D45",
+    backgroundColor: "#0E1324",
+    padding: 7,
+  },
+  scheduleCellActive: {
+    backgroundColor: "#1B1E30",
+    borderColor: "#2D3552",
+  },
+  scheduleDate: {
+    color: "#7E8BA5",
+    fontSize: 10,
+  },
+  dashboardCard: {
+    borderWidth: 1,
+    borderColor: "#1A2438",
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: "#070C18",
+    marginBottom: 12,
+  },
+  dashboardCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  dashboardCardTitle: {
+    color: "#F4F7FF",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  dashboardCardMeta: {
+    color: "#96A3BD",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  dashboardPickerWrap: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2C3855",
+    backgroundColor: "#111A2D",
+    overflow: "hidden",
+  },
+  dashboardPicker: {
+    color: "#ECF2FF",
+    height: 48,
+  },
   screen: {
     flex: 1,
     paddingHorizontal: 18,
@@ -385,6 +835,9 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     padding: 16,
     marginBottom: 14,
+    position: "relative",
+    zIndex: 130,
+    overflow: "visible",
   },
   heroIdentity: {
     flexDirection: "row",
@@ -409,6 +862,8 @@ const styles = StyleSheet.create({
   },
   mainPickerBlockHero: {
     marginTop: 14,
+    position: "relative",
+    zIndex: 160,
   },
   mainPickerLabelHero: {
     color: "#D7DFEA",
@@ -416,16 +871,61 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 6,
   },
-  mainPickerWrapHero: {
+  mainMenuAnchorHero: {
+    position: "relative",
+    zIndex: 180,
+  },
+  mainHeroButton: {
+    height: 42,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#4A607A",
-    backgroundColor: "#2A3C52",
-    overflow: "hidden",
+    borderColor: "#32435D",
+    backgroundColor: "#182536",
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
   },
-  mainPickerHero: {
+  mainHeroButtonLabel: {
     color: "#FFFFFF",
-    height: 48,
+    fontSize: 13,
+    fontWeight: "800",
+    flex: 1,
+  },
+  mainHeroButtonCaret: {
+    color: "#B7C4D8",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mainHeroDropdown: {
+    position: "absolute",
+    top: 46,
+    left: 0,
+    right: 0,
+    maxHeight: 240,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#32435D",
+    backgroundColor: "#131F30",
+    zIndex: 9999,
+    elevation: 9999,
+    paddingVertical: 6,
+  },
+  mainHeroList: {
+    maxHeight: 198,
+  },
+  mainHeroItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  mainHeroItemActive: {
+    backgroundColor: "#20334B",
+  },
+  mainHeroItemLabel: {
+    color: "#ECF2FF",
+    fontSize: 12,
+    fontWeight: "700",
   },
   mainSavingText: {
     marginTop: 6,
@@ -495,6 +995,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
+  },
+  recentNotesWrap: {
+    gap: 10,
   },
   listContent: {
     paddingBottom: 92,

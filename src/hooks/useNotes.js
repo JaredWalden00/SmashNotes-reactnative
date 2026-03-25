@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { GENERAL_FIGHTER_NAME, SMASH_FIGHTERS, getRosterFighters } from "../data/smashFighters";
 import { deleteNoteForUser, fetchNotesForUser, upsertNoteForUser } from "../utils/cloudNotes";
 import {
@@ -9,7 +9,9 @@ import {
 import { buildId, isRateLimitError } from "../utils/appHelpers";
 import {
   buildNoteTitle,
+  createCustomSectionKey,
   createEmptySections,
+  getActiveSectionKeys,
   matchesSmashNoteSearch,
   normalizeNote,
 } from "../utils/smashNoteModel";
@@ -28,6 +30,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   const [draftId, setDraftId] = useState(null);
   const [titleInput, setTitleInput] = useState("");
   const [editorSections, setEditorSections] = useState(createEmptySections());
+  const [editorSectionKeys, setEditorSectionKeys] = useState(["overview"]);
   const [draftContext, setDraftContext] = useState({
     character: GENERAL_FIGHTER_NAME,
     opponent: null,
@@ -68,7 +71,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         if (isMounted) {
           setNotes(remote);
           setUserMainCharacter(mainCharacter);
-          setSelectedCharacter((current) => current || mainCharacter || null);
+          // Keep landing on roster at startup; main remains available for highlighting.
+          setSelectedCharacter((current) => current || null);
         }
 
         await saveNotes(remote, userId);
@@ -162,6 +166,12 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     }, {});
   }, [notes]);
 
+  const recentNotes = useMemo(() => {
+    return [...notes]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 8);
+  }, [notes]);
+
   const canCreateMatchupNote = Boolean(
     selectedCharacter && selectedCharacter !== GENERAL_FIGHTER_NAME && selectedOpponent
   );
@@ -172,8 +182,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     }
 
     return draftContext.character === GENERAL_FIGHTER_NAME
-      ? "General notebook"
-      : `${draftContext.character} general notes`;
+      ? "Notebook"
+       : `${draftContext.character}`;
   }, [draftContext]);
 
   function resetEditor() {
@@ -181,6 +191,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(null);
     setTitleInput("");
     setEditorSections(createEmptySections());
+    setEditorSectionKeys(["overview"]);
     setDraftContext({
       character: selectedCharacter || GENERAL_FIGHTER_NAME,
       opponent: null,
@@ -213,11 +224,6 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
 
     try {
       await upsertMainCharacterForUser(userId, normalizedMain);
-      if (normalizedMain) {
-        showStatusPopup("success", "Main updated", `${normalizedMain} is now your selected main.`);
-      } else {
-        showStatusPopup("success", "Main cleared", "You no longer have a selected main.");
-      }
     } catch (error) {
       setUserMainCharacter(previousMain);
 
@@ -258,10 +264,80 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   }
 
   function updateSection(sectionKey, value) {
+    setEditorSectionKeys((current) => (current.includes(sectionKey) ? current : [...current, sectionKey]));
     setEditorSections((current) => ({
       ...current,
       [sectionKey]: value,
     }));
+  }
+
+  function setDraftCharacter(character) {
+    const normalizedCharacter = character || GENERAL_FIGHTER_NAME;
+
+    setDraftContext((current) => {
+      const shouldResetMatchup =
+        normalizedCharacter === GENERAL_FIGHTER_NAME || current.opponent === normalizedCharacter;
+
+      return {
+        ...current,
+        character: normalizedCharacter,
+        opponent: shouldResetMatchup ? null : current.opponent,
+        category: shouldResetMatchup ? "general" : current.category,
+      };
+    });
+  }
+
+  function addEditorSection(sectionKey) {
+    setEditorSectionKeys((current) => (current.includes(sectionKey) ? current : [...current, sectionKey]));
+  }
+
+  function addCustomEditorSection(label) {
+    const customSectionKey = createCustomSectionKey(label, editorSectionKeys);
+    if (!customSectionKey) {
+      return false;
+    }
+
+    setEditorSectionKeys((current) => (current.includes(customSectionKey) ? current : [...current, customSectionKey]));
+    setEditorSections((current) => ({
+      ...current,
+      [customSectionKey]: current[customSectionKey] || "",
+    }));
+
+    return true;
+  }
+
+  function removeEditorSection(sectionKey) {
+    setEditorSectionKeys((current) => {
+      if (current.length <= 1) {
+        return current;
+      }
+
+      return current.filter((key) => key !== sectionKey);
+    });
+
+    setEditorSections((current) => ({
+      ...current,
+      [sectionKey]: "",
+    }));
+  }
+
+  function moveEditorSection(sectionKey, direction) {
+    setEditorSectionKeys((current) => {
+      const currentIndex = current.indexOf(sectionKey);
+      if (currentIndex < 0) {
+        return current;
+      }
+
+      const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= current.length) {
+        return current;
+      }
+
+      const reordered = [...current];
+      const [moved] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      return reordered;
+    });
   }
 
   function openNewEditor() {
@@ -277,6 +353,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(null);
     setTitleInput("");
     setEditorSections(createEmptySections());
+    setEditorSectionKeys(["overview"]);
     setDraftContext({
       character: selectedCharacter,
       opponent: activeTab === "matchups" ? selectedOpponent : null,
@@ -289,10 +366,26 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(note.id);
     setTitleInput(note.title || "");
     setEditorSections(createEmptySections(note.sections));
+    setEditorSectionKeys(getActiveSectionKeys(note.sections));
     setDraftContext({
       character: note.character,
       opponent: note.opponent || null,
       category: note.category || (note.opponent ? "matchup" : "general"),
+    });
+    setIsEditorOpen(true);
+  }
+
+  function openQuickEditorForCharacter(character) {
+    const nextCharacter = character || GENERAL_FIGHTER_NAME;
+
+    setDraftId(null);
+    setTitleInput("");
+    setEditorSections(createEmptySections());
+    setEditorSectionKeys(["overview"]);
+    setDraftContext({
+      character: nextCharacter,
+      opponent: null,
+      category: "general",
     });
     setIsEditorOpen(true);
   }
@@ -390,33 +483,43 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   }
 
   function removeNote(noteId) {
+    const executeDelete = () => {
+      let nextNotes;
+      setNotes((current) => {
+        nextNotes = current.filter((note) => note.id !== noteId);
+        return nextNotes;
+      });
+
+      if (nextNotes) {
+        persistAndSync(nextNotes, null, noteId).catch((error) => {
+          if (isRateLimitError(error)) {
+            showServerOverloadedPopup();
+            return;
+          }
+
+          showStatusPopup(
+            "error",
+            "Delete sync failed",
+            "Note was removed locally but cloud sync failed."
+          );
+        });
+      }
+    };
+
+    if (Platform.OS === "web" && typeof globalThis.confirm === "function") {
+      const shouldDelete = globalThis.confirm("Delete note? This action cannot be undone.");
+      if (shouldDelete) {
+        executeDelete();
+      }
+      return;
+    }
+
     Alert.alert("Delete note", "This action cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
-        onPress: () => {
-          let nextNotes;
-          setNotes((current) => {
-            nextNotes = current.filter((note) => note.id !== noteId);
-            return nextNotes;
-          });
-
-          if (nextNotes) {
-            persistAndSync(nextNotes, null, noteId).catch((error) => {
-              if (isRateLimitError(error)) {
-                showServerOverloadedPopup();
-                return;
-              }
-
-              showStatusPopup(
-                "error",
-                "Delete sync failed",
-                "Note was removed locally but cloud sync failed."
-              );
-            });
-          }
-        },
+        onPress: executeDelete,
       },
     ]);
   }
@@ -431,6 +534,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     visibleFighters,
     visibleOpponents,
     fighterNoteCounts,
+    recentNotes,
     selectedCharacter,
     selectedOpponent,
     userMainCharacter,
@@ -444,14 +548,22 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     displayedNotes,
     canCreateMatchupNote,
     editorContextLabel,
+    draftCharacter: draftContext.character,
     isNotesLoading,
     isEditorOpen,
     draftId,
     titleInput,
     setTitleInput,
     editorSections,
+    editorSectionKeys,
     updateSection,
+    setDraftCharacter,
+    addEditorSection,
+    addCustomEditorSection,
+    removeEditorSection,
+    moveEditorSection,
     openNewEditor,
+    openQuickEditorForCharacter,
     openEditEditor,
     closeEditor,
     saveDraft,
