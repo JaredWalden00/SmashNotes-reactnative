@@ -4,6 +4,8 @@ import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data
 import FighterTile from "./FighterTile";
 import NoteItem from "./NoteItem";
 import SelectMenuButton from "./SelectMenuButton";
+import StartGGScreen from "./StartGGScreen";
+import { useStartGGSchedule } from "../hooks/useStartGG";
 
 const MAIN_NONE_VALUE = "__none__";
 
@@ -41,6 +43,8 @@ export default function NotesScreen({
   const { width } = useWindowDimensions();
   const isWideLayout = width >= 980;
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [activeNavSection, setActiveNavSection] = useState("my-stuff");
+  const { getTournamentsForDate, loading: tournamentsLoading } = useStartGGSchedule();
   const mainOptions = getRosterFighters();
   const mainMenuOptions = [
     { label: "No main", value: MAIN_NONE_VALUE },
@@ -57,6 +61,70 @@ export default function NotesScreen({
     onSetMainCharacter(nextMain === MAIN_NONE_VALUE ? null : nextMain);
   }
 
+  function handleCreateNoteFromStartGG(noteData) {
+    // When creating a note from Start.gg data, switch back to notes view and create the note
+    setActiveNavSection("my-stuff");
+    onCreateNote(noteData);
+  }
+
+  // If we're showing Start.gg features, render that instead of the normal dashboard
+  if (activeNavSection === "discovery" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? (
+          <View style={styles.sideRail}>
+            <Text style={styles.sideBrand}>SmashNotes</Text>
+            <Pressable 
+              style={styles.sideNavItem} 
+              onPress={() => setActiveNavSection("my-stuff")}
+            >
+              <Text style={styles.sideNavLabel}>My Stuff</Text>
+            </Pressable>
+            <Pressable style={styles.sidePrimaryNav}>
+              <Text style={styles.sidePrimaryNavLabel}>Start.gg</Text>
+            </Pressable>
+
+            <View style={styles.sideBottomNav}>
+              <Pressable style={styles.sideNavItem}>
+                <Text style={styles.sideNavLabel}>Search</Text>
+              </Pressable>
+              <Pressable style={styles.sideNavItem}>
+                <Text style={styles.sideNavLabel}>Chat</Text>
+              </Pressable>
+              <View style={styles.sideAccountAnchor}>
+                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
+                  <Text style={styles.sideNavLabel}>Account</Text>
+                </Pressable>
+                {isAccountMenuOpen ? (
+                  <View style={styles.accountDropdownSide}>
+                    <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
+                      <Text style={styles.accountDropdownLabel}>Sign out</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.dashboardMain}>
+          {!isWideLayout && (
+            <View style={styles.dashboardTopBar}>
+              <Pressable
+                style={styles.backToNotesBtn}  
+                onPress={() => setActiveNavSection("my-stuff")}
+              >
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+              <Text style={styles.dashboardTitle}>Start.gg</Text>
+            </View>
+          )}
+          <StartGGScreen onCreateNote={handleCreateNoteFromStartGG} />
+        </View>
+      </View>
+    );
+  }
+
   if (!selectedCharacter) {
     const scheduleDays = ["Today", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"];
 
@@ -68,8 +136,11 @@ export default function NotesScreen({
             <Pressable style={styles.sidePrimaryNav}>
               <Text style={styles.sidePrimaryNavLabel}>My Stuff</Text>
             </Pressable>
-            <Pressable style={styles.sideNavItem}>
-              <Text style={styles.sideNavLabel}>Discovery</Text>
+            <Pressable 
+              style={styles.sideNavItem}
+              onPress={() => setActiveNavSection("discovery")}
+            >
+              <Text style={styles.sideNavLabel}>Start.gg</Text>
             </Pressable>
 
             <View style={styles.sideBottomNav}>
@@ -99,6 +170,14 @@ export default function NotesScreen({
           <View style={styles.dashboardTopBar}>
             <Text style={styles.dashboardTitle}>My Stuff</Text>
             <View style={styles.topBarActions}>
+              {!isWideLayout && (
+                <Pressable
+                  style={styles.startggBtn}
+                  onPress={() => setActiveNavSection("discovery")}
+                >
+                  <Text style={styles.startggBtnLabel}>🏆 Start.gg</Text>
+                </Pressable>
+              )}
               <Pressable
                 style={styles.dashboardAddNoteBtn}
                 onPress={() => onQuickCreateNote(userMainCharacter || GENERAL_FIGHTER_NAME)}
@@ -154,14 +233,48 @@ export default function NotesScreen({
               </View>
 
               <View style={styles.scheduleGrid}>
-                {scheduleDays.map((day, index) => (
-                  <View key={day} style={styles.scheduleCol}>
-                    <Text style={[styles.scheduleDayLabel, index === 0 && styles.scheduleDayLabelActive]}>{day}</Text>
-                    <View style={[styles.scheduleCell, index === 0 && styles.scheduleCellActive]}>
-                      <Text style={styles.scheduleDate}>{24 + index}</Text>
+                {scheduleDays.map((day, index) => {
+                  // Calculate the date for each day
+                  const currentDate = new Date();
+                  currentDate.setDate(currentDate.getDate() + index);
+                  const tournaments = getTournamentsForDate(currentDate);
+                  
+                  return (
+                    <View key={day} style={styles.scheduleCol}>
+                      <Text style={[styles.scheduleDayLabel, index === 0 && styles.scheduleDayLabelActive]}>{day}</Text>
+                      <View style={[styles.scheduleCell, index === 0 && styles.scheduleCellActive]}>
+                        <Text style={styles.scheduleDate}>{currentDate.getDate()}</Text>
+                        
+                        {/* Tournament indicators */}
+                        {tournaments.length > 0 && (
+                          <View style={styles.tournamentIndicators}>
+                            {tournaments.slice(0, 2).map((tournament, tourIndex) => (
+                              <View key={tournament.id} style={styles.tournamentPill}>
+                                <Text style={styles.tournamentPillText} numberOfLines={1}>
+                                  {tournament.isOnline ? '🌐 ' : '🏟️ '}
+                                  {tournament.smashEvents.length > 0 ? '⚡ ' : ''}
+                                  {tournament.name.length > 8 
+                                    ? tournament.name.substring(0, 8) + '...' 
+                                    : tournament.name}
+                                </Text>
+                              </View>
+                            ))}
+                            {tournaments.length > 2 && (
+                              <View style={styles.tournamentMore}>
+                                <Text style={styles.tournamentMoreText}>+{tournaments.length - 2}</Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                        
+                        {/* Loading indicator */}
+                        {tournamentsLoading && index === 0 && (
+                          <ActivityIndicator size="small" color="#FF6B3D" style={styles.tournamentLoader} />
+                        )}
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             </View>
 
@@ -469,6 +582,28 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 12,
   },
+  startggBtn: {
+    borderRadius: 8,
+    backgroundColor: "#28a745",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  startggBtnLabel: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  backToNotesBtn: {
+    borderRadius: 6,
+    backgroundColor: "#6c757d",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  backToNotesBtnLabel: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 12,
+  },
   mainSwitcherAnchor: {
     position: "relative",
     minWidth: 180,
@@ -683,6 +818,37 @@ const styles = StyleSheet.create({
   scheduleDate: {
     color: "#7E8BA5",
     fontSize: 10,
+  },
+  tournamentIndicators: {
+    marginTop: 4,
+    gap: 2,
+  },
+  tournamentPill: {
+    backgroundColor: "#FF6B3D",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  tournamentPillText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "600",
+  },
+  tournamentMore: {
+    backgroundColor: "#666",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  tournamentMoreText: {
+    color: "#FFFFFF",
+    fontSize: 7,
+    fontWeight: "600",
+  },
+  tournamentLoader: {
+    marginTop: 4,
+    alignSelf: 'center',
   },
   dashboardCard: {
     borderWidth: 1,
