@@ -17,6 +17,11 @@ Current app runtime:
 - Cloud sync across devices with Supabase Postgres
 - Offline cache per user with AsyncStorage
 - Search notes by title or content
+- **Start.gg Integration (Optional)**:
+  - Tournament search and bracket viewing
+  - Player lookup with tournament history
+  - Character usage analytics
+  - Auto-generated matchup notes from tournament data
 
 ## Getting Started
 
@@ -33,6 +38,7 @@ Current app runtime:
    EXPO_PUBLIC_SUPABASE_URL=your_supabase_project_url
    EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    EXPO_PUBLIC_TURNSTILE_SITE_KEY=your_cloudflare_turnstile_site_key
+   EXPO_PUBLIC_START_GG_API_TOKEN=your_start_gg_api_token_here
 
 ### Google Sign-In Setup (Supabase + Google Cloud)
 
@@ -116,3 +122,52 @@ Without the site key, sign-up will show a configuration error.
    http://localhost:19006
 
    For mobile or non-Docker runs, see Run Modes below.
+
+### Start.gg API Integration (Optional)
+
+The app now includes integration with the Start.gg API for tournament and player data. This allows you to:
+
+- Search for tournaments and view brackets
+- Look up players and analyze their tournament history
+- View character usage statistics
+- Auto-generate matchup notes from tournament data
+
+#### Setup Start.gg Integration
+
+1. **Get a Start.gg API Token:**
+   - Visit [Start.gg Developer Settings](https://start.gg/admin/profile/developer)
+   - Click "Create new token"
+   - Enter a description for your token
+   - Copy the generated token (you won't see it again!)
+
+2. **Add the token to your environment:**
+   
+   Add this line to your `.env` file:
+   ```
+   EXPO_PUBLIC_START_GG_API_TOKEN=your_start_gg_api_token_here
+   ```
+   
+   Or see `.env.example` for a template.
+
+3. **Restart your development server** to load the new environment variable.
+
+#### Using Start.gg Features
+
+Once configured, you can access Start.gg features through:
+
+- **Tournament Browser**: Search for tournaments, view events and brackets
+- **Player Lookup**: Search for players, view their sets and character usage
+- **Auto-Note Generation**: Create matchup notes with pre-filled tournament data
+- **Settings**: Check connection status and view setup instructions
+
+The integration provides read-only access to public tournament data and respects Start.gg's rate limits.
+
+#### Supported Features
+
+- 🏆 **Tournament Search**: Find tournaments by name, location, or game
+- 🎮 **Player Analysis**: View player profiles, rankings, and recent sets
+- 📊 **Character Statistics**: Analyze character usage and win rates
+- 📝 **Smart Note Generation**: Create notes with tournament insights
+- ⚡ **Offline Mode**: App works without Start.gg integration if API is unavailable
+
+Note: Start.gg integration is completely optional. All core note-taking features work independently.

@@ -4,12 +4,15 @@ import AuthScreen from "./src/components/AuthScreen";
 import LoadingScreen from "./src/components/LoadingScreen";
 import NoteEditorModal from "./src/components/NoteEditorModal";
 import NotesScreen from "./src/components/NotesScreen";
+import { useStartGGAuth } from "./src/lib/startggAuth";
 import StatusModal from "./src/components/StatusModal";
 import { useAuth } from "./src/hooks/useAuth";
 import { useNotes } from "./src/hooks/useNotes";
 import { useStatusPopup } from "./src/hooks/useStatusPopup";
 
 export default function App() {
+  // Start.gg OAuth
+  const { user: startggUser, accessToken: startggAccessToken } = useStartGGAuth();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -176,6 +179,8 @@ export default function App() {
         onCreateNote={openNewEditor}
         onQuickCreateNote={openQuickEditorForCharacter}
         onSignOut={handleSignOut}
+        playerId={startggUser?.player?.id}
+        accessToken={startggAccessToken}
       />
 
       <NoteEditorModal
