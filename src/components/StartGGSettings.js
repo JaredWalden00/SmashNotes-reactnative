@@ -198,7 +198,7 @@ export default function StartGGSettings() {
             <View style={styles.userInfo}>
               <Text style={styles.userIcon}>👤</Text>
               <View>
-                <Text style={styles.userName}>{user?.gamerTag || 'Authenticated User'}</Text>
+                <Text style={styles.userName}>{user?.player?.gamerTag || user?.name || user?.email || 'Authenticated User'}</Text>
                 <Text style={styles.userSlug}>@{user?.slug || 'user'}</Text>
               </View>
             </View>

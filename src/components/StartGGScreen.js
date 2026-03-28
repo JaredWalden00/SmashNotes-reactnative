@@ -10,6 +10,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import TournamentBrowser from '../components/TournamentBrowser';
 import PlayerLookup from '../components/PlayerLookup';
 import StartGGSettings from '../components/StartGGSettings';
+import PlayerOpponentsTab from '../components/PlayerOpponentsTab';
 
 export default function StartGGScreen({ onCreateNote }) {
   const [activeTab, setActiveTab] = useState('tournaments');
@@ -35,17 +36,16 @@ export default function StartGGScreen({ onCreateNote }) {
             onTournamentSelect={handleTournamentSelect}
           />
         );
-      
       case 'players':
         return (
           <PlayerLookup 
             onCreateNote={handleCreateNote}
           />
         );
-      
+      case 'opponents':
+        return <PlayerOpponentsTab />;
       case 'settings':
         return <StartGGSettings />;
-      
       default:
         return (
           <View style={styles.centerContainer}>
@@ -67,7 +67,6 @@ export default function StartGGScreen({ onCreateNote }) {
             🏆 Tournaments
           </Text>
         </TouchableOpacity>
-        
         <TouchableOpacity
           style={[styles.tab, activeTab === 'players' && styles.activeTab]}
           onPress={() => setActiveTab('players')}
@@ -76,7 +75,14 @@ export default function StartGGScreen({ onCreateNote }) {
             🎮 Players
           </Text>
         </TouchableOpacity>
-        
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'opponents' && styles.activeTab]}
+          onPress={() => setActiveTab('opponents')}
+        >
+          <Text style={[styles.tabText, activeTab === 'opponents' && styles.activeTabText]}>
+            🤼 Opponents
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'settings' && styles.activeTab]}
           onPress={() => setActiveTab('settings')}

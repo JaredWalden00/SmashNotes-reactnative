@@ -15,47 +15,44 @@ export class StartGGAuth {
     this.clientId = process.env.EXPO_PUBLIC_START_GG_CLIENT_ID;
     this.clientSecret = process.env.START_GG_CLIENT_SECRET;
     // Use the EXACT redirect URI configured in Start.gg OAuth app
-    this.redirectUri = 'https://example.com/auth/callback';
-    
+    this.redirectUri = 'http://localhost:8081/auth/callback'; // Must match Start.gg app settings
     // Debug: Log the redirect URI being used  
     console.log('OAuth Config:');
     console.log('- Client ID:', this.clientId);
     console.log('- Redirect URI:', this.redirectUri);
   }
 
-  // Configure OAuth request
-  getAuthRequest() {
-    const request = new AuthRequest({
+  // Return config object for useAuthRequest
+  getAuthRequestConfig() {
+    return {
       clientId: this.clientId,
-      scopes: ['user.identity', 'user.email'], // Official Start.gg supported scopes
+      scopes: ['user.identity', 'user.email'],
       redirectUri: this.redirectUri,
       responseType: 'code',
-    });
-    
-    return request;
+    };
   }
 
   // Exchange authorization code for access token (following Start.gg documentation)
   async exchangeCodeForToken(code) {
     try {
-      const response = await fetch(START_GG_TOKEN_ENDPOINT, {
+      // Get the code_verifier from the AuthRequest instance
+      const codeVerifier = this._lastCodeVerifier || null;
+      // POST the code and code_verifier to your backend endpoint
+      const response = await fetch('http://localhost:3001/api/startgg/exchange', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          grant_type: 'authorization_code',
-          client_secret: this.clientSecret,
           code: code,
-          scope: 'user.identity user.email', // Space-separated as per documentation
-          client_id: this.clientId,
           redirect_uri: this.redirectUri,
+          code_verifier: codeVerifier,
         }),
       });
 
       const data = await response.json();
-      console.log('Token exchange response:', data);
-      
+      console.log('Backend token exchange response:', data);
+
       if (data.access_token) {
         // Store tokens securely
         await AsyncStorage.setItem('startgg_access_token', data.access_token);
@@ -64,7 +61,7 @@ export class StartGGAuth {
           String(Date.now() + (data.expires_in * 1000)));
         return data.access_token;
       }
-      
+
       throw new Error(data.error_description || data.error || 'Failed to exchange code for token');
     } catch (error) {
       console.error('OAuth token exchange failed:', error);
@@ -167,14 +164,30 @@ export function useStartGGAuth() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
-  
-  const authService = new StartGGAuth();
-  
-  // Configure the auth request
+  const [accessToken, setAccessToken] = useState(null);
+
+  const { useMemo } = require('react');
+  const authService = useMemo(() => new StartGGAuth(), []);
+
+  // Discovery object for expo-auth-session
+  const discovery = {
+    authorizationEndpoint: START_GG_AUTH_ENDPOINT,
+    tokenEndpoint: START_GG_TOKEN_ENDPOINT,
+    revocationEndpoint: START_GG_REFRESH_ENDPOINT,
+  };
+
+  // Configure the auth request (pass config object, not AuthRequest instance)
   const [request, response, promptAsync] = useAuthRequest(
-    authService.getAuthRequest(),
-    { authorizationEndpoint: START_GG_AUTH_ENDPOINT }
+    authService.getAuthRequestConfig(),
+    discovery
   );
+
+  // Save code_verifier for token exchange
+  useEffect(() => {
+    if (request && request.codeVerifier) {
+      authService._lastCodeVerifier = request.codeVerifier;
+    }
+  }, [request]);
 
   // Check authentication status on mount
   useEffect(() => {
@@ -183,19 +196,21 @@ export function useStartGGAuth() {
 
   // Handle OAuth response
   useEffect(() => {
-    if (response?.type === 'success') {
-      handleAuthSuccess(response.params.code);
-    } else if (response?.type === 'error') {
-      console.error('OAuth error:', response.error);
-      setIsLoading(false);
-    }
-  }, [response]);
+  console.log('OAuth response:', response);
+  if (response?.type === 'success') {
+    handleAuthSuccess(response.params.code);
+  } else if (response?.type === 'error') {
+    console.error('OAuth error:', response.error);
+    setIsLoading(false);
+  }
+}, [response]);
 
   const checkAuthStatus = async () => {
     try {
-      const authenticated = await authService.isAuthenticated();
+      const token = await authService.getAccessToken();
+      setAccessToken(token);
+      const authenticated = !!token;
       setIsAuthenticated(authenticated);
-      
       if (authenticated) {
         // Load user info if available
         const userInfo = await AsyncStorage.getItem('startgg_user_info');
@@ -213,11 +228,12 @@ export function useStartGGAuth() {
   const handleAuthSuccess = async (code) => {
     try {
       setIsLoading(true);
-      const accessToken = await authService.exchangeCodeForToken(code);
-      
-      // Fetch user info with the new token
-      await fetchUserInfo(accessToken);
-      
+      console.log('OAuth code received:', code);
+      const token = await authService.exchangeCodeForToken(code);
+      setAccessToken(token);
+      console.log('Access token received:', token);
+      const user = await fetchUserInfo(token);
+      console.log('Fetched user info:', user);
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Authentication failed:', error);
@@ -242,8 +258,9 @@ export function useStartGGAuth() {
               currentUser {
                 id
                 slug
-                gamerTag
                 email
+                name
+                discriminator
                 player {
                   id
                   gamerTag
@@ -271,15 +288,16 @@ export function useStartGGAuth() {
     return null;
   };
 
-  const login = async () => {
-    try {
-      setIsLoading(true);
-      await promptAsync();
-    } catch (error) {
-      console.error('Login failed:', error);
-      setIsLoading(false);
-    }
-  };
+ const login = async () => {
+  try {
+    setIsLoading(true);
+    console.log('Prompting OAuth login...');
+    await promptAsync();
+  } catch (error) {
+    console.error('Login failed:', error);
+    setIsLoading(false);
+  }
+};
 
   const logout = async () => {
     try {
@@ -298,6 +316,7 @@ export function useStartGGAuth() {
     isAuthenticated,
     isLoading,
     user,
+    accessToken,
     login,
     logout,
     authService,
