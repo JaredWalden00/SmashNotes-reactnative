@@ -1,0 +1,4 @@
+# Node server Docker ignore
+node_modules
+npm-debug.log
+.env

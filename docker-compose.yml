@@ -18,5 +18,21 @@ services:
       - ./:/app
       - smashnotes_node_modules:/app/node_modules
 
+  node-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: smashnotes-node-server
+    env_file:
+      - ../.env
+    ports:
+      - "3001:3001"
+    working_dir: /app
+    command: npm start
+    volumes:
+      - ./server:/app
+      - smashnotes_server_node_modules:/app/node_modules
+
 volumes:
   smashnotes_node_modules:
+  smashnotes_server_node_modules:

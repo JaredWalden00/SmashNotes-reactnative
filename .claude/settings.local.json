@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"createNativeStackNavigator\\\\|createBottomTabNavigator\\\\|NavigationContainer\\\\|@react-navigation\" /c/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/src --include=*.js)",
+      "Bash(npx expo:*)",
+      "Bash(npm uninstall:*)"
+    ]
+  }
+}

@@ -36,6 +36,7 @@ export default function NotesScreen({
   canCreateMatchupNote,
   onEditNote,
   onDeleteNote,
+  onSaveInlineEdit,
   onCreateNote,
   onQuickCreateNote,
   onSignOut,
@@ -242,7 +243,7 @@ export default function NotesScreen({
 
               <View style={styles.recentNotesWrap}>
                 {visibleRecentNotes.map((note) => (
-                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} forceDark />
+                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark />
                 ))}
               </View>
 
@@ -417,7 +418,7 @@ export default function NotesScreen({
 
             {displayedNotes.length ? (
               displayedNotes.map((note) => (
-                <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} />
+                <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} />
               ))
             ) : (
               <View style={[styles.emptyStateCard, isDark && styles.emptyStateCardDark]}>

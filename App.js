@@ -96,6 +96,7 @@ export default function App() {
     closeEditor,
     saveDraft,
     removeNote,
+    saveInlineEdit,
   } = useNotes({ userId, showStatusPopup, showServerOverloadedPopup });
 
   if (isAuthLoading) {
@@ -176,6 +177,7 @@ export default function App() {
         canCreateMatchupNote={canCreateMatchupNote}
         onEditNote={openEditEditor}
         onDeleteNote={removeNote}
+        onSaveInlineEdit={saveInlineEdit}
         onCreateNote={openNewEditor}
         onQuickCreateNote={openQuickEditorForCharacter}
         onSignOut={handleSignOut}

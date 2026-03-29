@@ -482,6 +482,48 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     }
   }
 
+  function saveInlineEdit(noteId, updatedTitle, updatedSections) {
+    const nextSections = createEmptySections(updatedSections);
+    const now = Date.now();
+    let upsertedNote;
+    let nextNotes;
+
+    setNotes((current) => {
+      nextNotes = current
+        .map((note) => {
+          if (note.id !== noteId) {
+            return note;
+          }
+
+          upsertedNote = normalizeNote({
+            ...note,
+            title: buildNoteTitle(note.character, note.opponent, updatedTitle),
+            updatedAt: now,
+            sections: nextSections,
+          });
+          return upsertedNote;
+        })
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return nextNotes;
+    });
+
+    if (nextNotes && upsertedNote) {
+      persistAndSync(nextNotes, upsertedNote, null).catch((error) => {
+        if (isRateLimitError(error)) {
+          showServerOverloadedPopup();
+          return;
+        }
+
+        showStatusPopup(
+          "error",
+          "Save failed",
+          "Your note was updated locally but cloud sync failed."
+        );
+      });
+    }
+  }
+
   function removeNote(noteId) {
     const executeDelete = () => {
       let nextNotes;
@@ -568,5 +610,6 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     closeEditor,
     saveDraft,
     removeNote,
+    saveInlineEdit,
   };
 }
