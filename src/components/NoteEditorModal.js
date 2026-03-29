@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SMASH_FIGHTERS } from "../data/smashFighters";
 import { NOTE_SECTION_OPTIONS, getSectionLabel, getSectionPlaceholder } from "../utils/smashNoteModel";
+import LiveTextEditor from "./LiveTextEditor";
 import SelectMenuButton from "./SelectMenuButton";
 
 export default function NoteEditorModal({
@@ -165,14 +166,11 @@ export default function NoteEditorModal({
                   </View>
                 </View>
 
-                <TextInput
-                  style={[styles.inputBody, isDark && styles.inputDark]}
+                <LiveTextEditor
                   value={editorSections[section.key] || ""}
-                  onChangeText={(value) => updateSection(section.key, value)}
+                  onChange={(value) => updateSection(section.key, value)}
                   placeholder={section.placeholder}
-                  placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
-                  multiline
-                  textAlignVertical="top"
+                  minHeight={110}
                 />
               </View>
             ))}
