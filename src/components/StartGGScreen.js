@@ -8,12 +8,14 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import TournamentBrowser from '../components/TournamentBrowser';
+
 import PlayerLookup from '../components/PlayerLookup';
 import StartGGSettings from '../components/StartGGSettings';
 import PlayerOpponentsTab from '../components/PlayerOpponentsTab';
 
 export default function StartGGScreen({ onCreateNote }) {
   const [activeTab, setActiveTab] = useState('tournaments');
+  const [playerSearchQuery, setPlayerSearchQuery] = useState('');
 
   const handleTournamentSelect = (tournament) => {
     console.log('Selected tournament:', tournament);
@@ -28,6 +30,11 @@ export default function StartGGScreen({ onCreateNote }) {
     onCreateNote?.(noteData);
   };
 
+  const handleOpponentPress = (gamerTag) => {
+    setPlayerSearchQuery(gamerTag);
+    setActiveTab('players');
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'tournaments':
@@ -40,10 +47,11 @@ export default function StartGGScreen({ onCreateNote }) {
         return (
           <PlayerLookup 
             onCreateNote={handleCreateNote}
+            searchQuery={playerSearchQuery}
           />
         );
       case 'opponents':
-        return <PlayerOpponentsTab />;
+        return <PlayerOpponentsTab onOpponentPress={handleOpponentPress} />;
       case 'settings':
         return <StartGGSettings />;
       default:

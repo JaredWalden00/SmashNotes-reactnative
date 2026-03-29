@@ -13,7 +13,8 @@ import {
 import { useStartGGPlayer } from "../hooks/useStartGG";
 import { SMASH_FIGHTERS } from "../data/smashFighters";
 
-export default function PlayerLookup({ onCreateNote }) {
+
+export default function PlayerLookup({ onCreateNote, searchQuery: externalSearchQuery }) {
   const {
     players,
     selectedPlayer,
@@ -27,7 +28,16 @@ export default function PlayerLookup({ onCreateNote }) {
     clearSearch
   } = useStartGGPlayer();
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(externalSearchQuery || "");
+
+  // If the searchQuery prop changes, update local state and trigger search
+  React.useEffect(() => {
+    if (externalSearchQuery && externalSearchQuery !== searchQuery) {
+      setSearchQuery(externalSearchQuery);
+      searchForPlayers(externalSearchQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalSearchQuery]);
 
   const handleSearch = () => {
     if (!searchQuery.trim()) {
@@ -266,9 +276,7 @@ ${playerSets.slice(0, 3).map(set => {
         <ScrollView style={styles.playerDetailsContainer}>
           <View style={styles.selectedPlayerHeader}>
             <Text style={styles.selectedPlayerName}>
-              {selectedPlayer.player?.prefix ? 
-                `${selectedPlayer.player.prefix} | ` : ''}
-              {selectedPlayer.player?.gamerTag || selectedPlayer.slug}
+              {(selectedPlayer.player?.prefix ? selectedPlayer.player.prefix + ' | ' : '') + (selectedPlayer.player?.gamerTag || selectedPlayer.slug)}
             </Text>
             
             <TouchableOpacity

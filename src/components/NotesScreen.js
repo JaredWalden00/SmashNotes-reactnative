@@ -1,3 +1,4 @@
+import RecentCharactersCard from "./RecentCharactersCard";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme, useWindowDimensions } from "react-native";
 import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data/smashFighters";
@@ -38,6 +39,8 @@ export default function NotesScreen({
   onCreateNote,
   onQuickCreateNote,
   onSignOut,
+  playerId,
+  accessToken,
 }) {
   const isDark = useColorScheme() === "dark";
   const { width } = useWindowDimensions();
@@ -305,6 +308,17 @@ export default function NotesScreen({
                   <Text style={[styles.emptyBody, styles.emptyBodyDark]}>Create a note or adjust your search.</Text>
                 </View>
               ) : null}
+            </View>
+
+            <View style={styles.dashboardCard}>
+              <RecentCharactersCard
+                playerId={playerId}
+                accessToken={accessToken}
+                onSelectCharacter={(characterName) => {
+                  if (onSelectCharacter) onSelectCharacter(characterName);
+                  setActiveNavSection && setActiveNavSection("my-stuff");
+                }}
+              />
             </View>
           </ScrollView>
         </View>
