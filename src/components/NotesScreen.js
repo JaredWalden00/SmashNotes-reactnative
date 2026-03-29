@@ -225,62 +225,6 @@ export default function NotesScreen({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
-            <View style={styles.schedulePanel}>
-              <View style={styles.schedulePillRow}>
-                <View style={styles.schedulePillActive}>
-                  <Text style={styles.schedulePillActiveLabel}>Up next</Text>
-                </View>
-                <View style={styles.schedulePill}>
-                  <Text style={styles.schedulePillLabel}>Posts</Text>
-                </View>
-              </View>
-
-              <View style={styles.scheduleGrid}>
-                {scheduleDays.map((day, index) => {
-                  // Calculate the date for each day
-                  const currentDate = new Date();
-                  currentDate.setDate(currentDate.getDate() + index);
-                  const tournaments = getTournamentsForDate(currentDate);
-                  
-                  return (
-                    <View key={day} style={styles.scheduleCol}>
-                      <Text style={[styles.scheduleDayLabel, index === 0 && styles.scheduleDayLabelActive]}>{day}</Text>
-                      <View style={[styles.scheduleCell, index === 0 && styles.scheduleCellActive]}>
-                        <Text style={styles.scheduleDate}>{currentDate.getDate()}</Text>
-                        
-                        {/* Tournament indicators */}
-                        {tournaments.length > 0 && (
-                          <View style={styles.tournamentIndicators}>
-                            {tournaments.slice(0, 2).map((tournament, tourIndex) => (
-                              <View key={tournament.id} style={styles.tournamentPill}>
-                                <Text style={styles.tournamentPillText} numberOfLines={1}>
-                                  {tournament.isOnline ? '🌐 ' : '🏟️ '}
-                                  {tournament.smashEvents.length > 0 ? '⚡ ' : ''}
-                                  {tournament.name.length > 8 
-                                    ? tournament.name.substring(0, 8) + '...' 
-                                    : tournament.name}
-                                </Text>
-                              </View>
-                            ))}
-                            {tournaments.length > 2 && (
-                              <View style={styles.tournamentMore}>
-                                <Text style={styles.tournamentMoreText}>+{tournaments.length - 2}</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                        
-                        {/* Loading indicator */}
-                        {tournamentsLoading && index === 0 && (
-                          <ActivityIndicator size="small" color="#FF6B3D" style={styles.tournamentLoader} />
-                        )}
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-
             <View style={styles.dashboardCard}>
               <View style={styles.dashboardCardHeader}>
                 <Text style={styles.dashboardCardTitle}>Recent Notes</Text>
