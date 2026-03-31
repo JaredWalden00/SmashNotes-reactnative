@@ -84,6 +84,7 @@ export default function App() {
     canCreateMatchupNote,
     editorContextLabel,
     draftCharacter,
+    draftSetInfo,
     isNotesLoading,
     isEditorOpen,
     draftId,
@@ -197,6 +198,8 @@ export default function App() {
         startggLogout={startggLogout}
         playerId={startggUser?.player?.id}
         accessToken={startggAccessToken}
+        session={session}
+        userId={userId}
       />
 
       <NoteEditorModal
@@ -209,6 +212,7 @@ export default function App() {
         onChangeDraftCharacter={setDraftCharacter}
         draftPlayerTag={draftPlayerTag}
         setDraftPlayerTag={setDraftPlayerTag}
+        draftSetInfo={draftSetInfo}
         editorSections={editorSections}
         editorSectionKeys={editorSectionKeys}
         updateSection={updateSection}

@@ -15,6 +15,10 @@ function fromDb(row) {
     sections: row.sections || undefined,
     playerTag: row.player_tag || undefined,
     startggPlayerId: row.startgg_player_id || undefined,
+    setId: row.set_id || undefined,
+    setTournament: row.set_tournament || undefined,
+    setEvent: row.set_event || undefined,
+    setScore: row.set_score || undefined,
     updatedAt: Number.isFinite(parsed) ? parsed : Date.now(),
   });
 
@@ -38,6 +42,10 @@ function toDb(note, userId) {
     sections: normalized.sections || {},
     player_tag: normalized.playerTag || null,
     startgg_player_id: normalized.startggPlayerId || null,
+    set_id: normalized.setId || null,
+    set_tournament: normalized.setTournament || null,
+    set_event: normalized.setEvent || null,
+    set_score: normalized.setScore || null,
     updated_at: new Date(normalized.updatedAt || Date.now()).toISOString(),
   };
 }
@@ -46,11 +54,11 @@ export async function fetchNotesForUser(userId) {
   // Try with new player columns first; fall back to old schema if they don't exist yet
   let { data, error } = await supabase
     .from(NOTES_TABLE)
-    .select("id, title, body, character, opponent, category, sections, player_tag, startgg_player_id, updated_at")
+    .select("id, title, body, character, opponent, category, sections, player_tag, startgg_player_id, set_id, set_tournament, set_event, set_score, updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
 
-  if (error && /player_tag|startgg_player_id/.test(error.message || error.code || "")) {
+  if (error && /player_tag|startgg_player_id|set_id|set_tournament|set_event|set_score/.test(error.message || error.code || "")) {
     ({ data, error } = await supabase
       .from(NOTES_TABLE)
       .select("id, title, body, character, opponent, category, sections, updated_at")
@@ -73,8 +81,8 @@ export async function upsertNoteForUser(userId, note) {
   });
 
   // If upsert fails due to missing columns, retry without the new fields
-  if (error && /player_tag|startgg_player_id/.test(error.message || error.code || "")) {
-    const { player_tag, startgg_player_id, ...rowWithoutPlayerFields } = row;
+  if (error && /player_tag|startgg_player_id|set_id|set_tournament|set_event|set_score/.test(error.message || error.code || "")) {
+    const { player_tag, startgg_player_id, set_id, set_tournament, set_event, set_score, ...rowWithoutPlayerFields } = row;
     ({ error } = await supabase.from(NOTES_TABLE).upsert([rowWithoutPlayerFields], {
       onConflict: "id",
     }));

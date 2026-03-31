@@ -7,6 +7,9 @@ import FighterTile from "./FighterTile";
 import NoteItem from "./NoteItem";
 import SelectMenuButton from "./SelectMenuButton";
 import StartGGScreen from "./StartGGScreen";
+import StatsTab from "./StatsTab";
+import PlayersTab from "./PlayersTab";
+import SettingsTab from "./SettingsTab";
 import { matchesSmashNoteSearch } from "../utils/smashNoteModel";
 import { useStartGGSchedule } from "../hooks/useStartGG";
 
@@ -49,6 +52,8 @@ export default function NotesScreen({
   startggLogout,
   playerId,
   accessToken,
+  session,
+  userId,
 }) {
   const isDark = useColorScheme() === "dark";
   const { width } = useWindowDimensions();
@@ -61,6 +66,14 @@ export default function NotesScreen({
   const [allNotesSearch, setAllNotesSearch] = useState("");
   const [allNotesCharFilter, setAllNotesCharFilter] = useState(null);
   const [allNotesPlayerFilter, setAllNotesPlayerFilter] = useState("");
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+
+  function navigateTo(section) {
+    setActiveNavSection(section);
+    if (section === "my-stuff") {
+      setDashboardRefreshKey((k) => k + 1);
+    }
+  }
   const { getTournamentsForDate, loading: tournamentsLoading } = useStartGGSchedule();
   const mainOptions = getRosterFighters();
   const mainMenuOptions = [
@@ -92,7 +105,7 @@ export default function NotesScreen({
 
   function handleCreateNoteFromStartGG(noteData) {
     // When creating a note from Start.gg data, switch back to notes view and create the note
-    setActiveNavSection("my-stuff");
+    navigateTo("my-stuff");
     onCreateNote(noteData);
   }
 
@@ -176,33 +189,12 @@ export default function NotesScreen({
 
     return (
       <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? (
-          <View style={styles.sideRail}>
-            <Text style={styles.sideBrand}>SmashNotes</Text>
-            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("my-stuff")}>
-              <Text style={styles.sideNavLabel}>My Stuff</Text>
-            </Pressable>
-            <Pressable style={styles.sidePrimaryNav}>
-              <Text style={styles.sidePrimaryNavLabel}>All Notes</Text>
-            </Pressable>
-            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("discovery")}>
-              <Text style={styles.sideNavLabel}>Start.gg</Text>
-            </Pressable>
-            <View style={styles.sideBottomNav}>
-              <View style={styles.sideAccountAnchor}>
-                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((c) => !c)}>
-                  <Text style={styles.sideNavLabel}>Account</Text>
-                </Pressable>
-                {isAccountMenuOpen ? renderAccountPanel("side") : null}
-              </View>
-            </View>
-          </View>
-        ) : null}
+        {isWideLayout ? renderSideRail("all-notes") : null}
 
         <View style={styles.dashboardMain}>
           <View style={styles.dashboardTopBar}>
             {!isWideLayout ? (
-              <Pressable style={styles.backToNotesBtn} onPress={() => setActiveNavSection("my-stuff")}>
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
                 <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
               </Pressable>
             ) : null}
@@ -274,47 +266,164 @@ export default function NotesScreen({
     );
   }
 
+  // Helper to render side rail nav for any tab
+  function renderSideRail(activeSection) {
+    const navItems = [
+      { key: "my-stuff", label: "My Stuff" },
+      { key: "all-notes", label: "All Notes" },
+      { key: "stats", label: "Stats" },
+      { key: "players", label: "Players" },
+      { key: "discovery", label: "Start.gg" },
+    ];
+    return (
+      <View style={styles.sideRail}>
+        <Text style={styles.sideBrand}>SmashNotes</Text>
+        {navItems.map((item) => (
+          <Pressable
+            key={item.key}
+            style={item.key === activeSection ? styles.sidePrimaryNav : styles.sideNavItem}
+            onPress={() => item.key !== activeSection && navigateTo(item.key)}
+          >
+            <Text style={item.key === activeSection ? styles.sidePrimaryNavLabel : styles.sideNavLabel}>
+              {item.label}
+            </Text>
+          </Pressable>
+        ))}
+        <View style={styles.sideBottomNav}>
+          <Pressable
+            style={activeSection === "settings" ? styles.sidePrimaryNav : styles.sideNavItem}
+            onPress={() => navigateTo("settings")}
+          >
+            <Text style={activeSection === "settings" ? styles.sidePrimaryNavLabel : styles.sideNavLabel}>Settings</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  // Helper for mobile top bar nav buttons
+  function renderMobileNav(activeSection) {
+    const navItems = [
+      { key: "all-notes", label: "All Notes" },
+      { key: "stats", label: "Stats" },
+      { key: "players", label: "Players" },
+      { key: "discovery", label: "Start.gg" },
+      { key: "settings", label: "Settings" },
+    ];
+    return navItems
+      .filter((item) => item.key !== activeSection)
+      .map((item) => (
+        <Pressable key={item.key} style={styles.startggBtn} onPress={() => navigateTo(item.key)}>
+          <Text style={styles.startggBtnLabel}>{item.label}</Text>
+        </Pressable>
+      ));
+  }
+
+  // Stats tab
+  if (activeNavSection === "stats" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("stats") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>Stats</Text>
+          </View>
+          <StatsTab
+            playerId={playerId}
+            accessToken={accessToken}
+            onCreateSetNote={(setData) => {
+              onQuickCreateNote(GENERAL_FIGHTER_NAME, {
+                setId: setData.setId,
+                setTournament: setData.setTournament,
+                setEvent: setData.setEvent,
+                setScore: setData.setScore,
+                playerTag: setData.playerTag,
+                opponent: setData.playerTag,
+              });
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Players tab
+  if (activeNavSection === "players" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("players") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>Players</Text>
+          </View>
+          <PlayersTab
+            allNotes={allNotes}
+            onEditNote={onEditNote}
+            onDeleteNote={onDeleteNote}
+            onSaveInlineEdit={onSaveInlineEdit}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Settings tab
+  if (activeNavSection === "settings" && !selectedCharacter) {
+    const MAIN_NONE = "__none__";
+    const settingsMainOptions = [
+      { label: "No main", value: MAIN_NONE },
+      ...getRosterFighters().map((f) => ({ label: f.name, value: f.name, icon: f.icon })),
+    ];
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("settings") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>Settings</Text>
+          </View>
+          <SettingsTab
+            startggUser={startggUser}
+            startggIsAuthenticated={startggIsAuthenticated}
+            startggLogin={startggLogin}
+            startggLogout={startggLogout}
+            userMainCharacter={userMainCharacter}
+            onSetMainCharacter={onSetMainCharacter}
+            mainMenuOptions={settingsMainOptions}
+            isMainSaving={isMainSaving}
+            onSignOut={onSignOut}
+            allNotes={allNotes}
+            userId={userId}
+            session={session}
+          />
+        </View>
+      </View>
+    );
+  }
+
   // If we're showing Start.gg features, render that instead of the normal dashboard
   if (activeNavSection === "discovery" && !selectedCharacter) {
     return (
       <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? (
-          <View style={styles.sideRail}>
-            <Text style={styles.sideBrand}>SmashNotes</Text>
-            <Pressable 
-              style={styles.sideNavItem} 
-              onPress={() => setActiveNavSection("my-stuff")}
-            >
-              <Text style={styles.sideNavLabel}>My Stuff</Text>
-            </Pressable>
-            <Pressable style={styles.sidePrimaryNav}>
-              <Text style={styles.sidePrimaryNavLabel}>Start.gg</Text>
-            </Pressable>
-
-            <View style={styles.sideBottomNav}>
-              <Pressable style={styles.sideNavItem}>
-                <Text style={styles.sideNavLabel}>Search</Text>
-              </Pressable>
-              <Pressable style={styles.sideNavItem}>
-                <Text style={styles.sideNavLabel}>Chat</Text>
-              </Pressable>
-              <View style={styles.sideAccountAnchor}>
-                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
-                  <Text style={styles.sideNavLabel}>Account</Text>
-                </Pressable>
-                {isAccountMenuOpen ? renderAccountPanel("side") : null}
-              </View>
-            </View>
-          </View>
-        ) : null}
-
+        {isWideLayout ? renderSideRail("discovery") : null}
         <View style={styles.dashboardMain}>
           {!isWideLayout && (
             <View style={styles.dashboardTopBar}>
-              <Pressable
-                style={styles.backToNotesBtn}  
-                onPress={() => setActiveNavSection("my-stuff")}
-              >
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
                 <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
               </Pressable>
               <Text style={styles.dashboardTitle}>Start.gg</Text>
@@ -345,6 +454,7 @@ export default function NotesScreen({
               <RecentCharactersCard
                 playerId={playerId}
                 accessToken={accessToken}
+                refreshKey={dashboardRefreshKey}
                 showAll
                 onSelectCharacter={(characterName) => {
                   setShowAllMatchups(false);
@@ -380,7 +490,7 @@ export default function NotesScreen({
             <Pressable
               style={styles.dashboardAddNoteBtn}
               onPress={() => {
-                onQuickCreateNote(userMainCharacter || GENERAL_FIGHTER_NAME, {
+                onQuickCreateNote(GENERAL_FIGHTER_NAME, {
                   playerTag: filteredPlayerTag,
                   startggPlayerId: filteredPlayerId,
                   opponent: filteredPlayerTag,
@@ -425,56 +535,16 @@ export default function NotesScreen({
 
     return (
       <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? (
-          <View style={styles.sideRail}>
-            <Text style={styles.sideBrand}>SmashNotes</Text>
-            <Pressable style={styles.sidePrimaryNav}>
-              <Text style={styles.sidePrimaryNavLabel}>My Stuff</Text>
-            </Pressable>
-            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("all-notes")}>
-              <Text style={styles.sideNavLabel}>All Notes</Text>
-            </Pressable>
-            <Pressable
-              style={styles.sideNavItem}
-              onPress={() => setActiveNavSection("discovery")}
-            >
-              <Text style={styles.sideNavLabel}>Start.gg</Text>
-            </Pressable>
-
-            <View style={styles.sideBottomNav}>
-              <View style={styles.sideAccountAnchor}>
-                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
-                  <Text style={styles.sideNavLabel}>Account</Text>
-                </Pressable>
-                {isAccountMenuOpen ? renderAccountPanel("side") : null}
-              </View>
-            </View>
-          </View>
-        ) : null}
+        {isWideLayout ? renderSideRail("my-stuff") : null}
 
         <View style={styles.dashboardMain}>
           <View style={styles.dashboardTopBar}>
             <Text style={styles.dashboardTitle}>My Stuff</Text>
             <View style={styles.topBarActions}>
-              {!isWideLayout && (
-                <>
-                  <Pressable
-                    style={styles.startggBtn}
-                    onPress={() => setActiveNavSection("all-notes")}
-                  >
-                    <Text style={styles.startggBtnLabel}>All Notes</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.startggBtn}
-                    onPress={() => setActiveNavSection("discovery")}
-                  >
-                    <Text style={styles.startggBtnLabel}>Start.gg</Text>
-                </Pressable>
-                </>
-              )}
+              {!isWideLayout && renderMobileNav("my-stuff")}
               <Pressable
                 style={styles.dashboardAddNoteBtn}
-                onPress={() => onQuickCreateNote(userMainCharacter || GENERAL_FIGHTER_NAME)}
+                onPress={() => onQuickCreateNote(GENERAL_FIGHTER_NAME)}
               >
                 <Text style={styles.dashboardAddNoteLabel}>+ Add note</Text>
               </Pressable>
@@ -545,9 +615,10 @@ export default function NotesScreen({
               <RecentCharactersCard
                 playerId={playerId}
                 accessToken={accessToken}
+                refreshKey={dashboardRefreshKey}
                 onSelectCharacter={(characterName) => {
                   if (onSelectCharacter) onSelectCharacter(characterName);
-                  setActiveNavSection && setActiveNavSection("my-stuff");
+                  navigateTo && navigateTo("my-stuff");
                 }}
                 onShowAll={() => setShowAllMatchups(true)}
               />
@@ -557,9 +628,10 @@ export default function NotesScreen({
               <RecentOpponentsCard
                 playerId={playerId}
                 accessToken={accessToken}
+                refreshKey={dashboardRefreshKey}
                 notes={allNotes}
                 onSelectOpponent={(opponent) => {
-                  setActiveNavSection("my-stuff");
+                  navigateTo("my-stuff");
                   setFilteredPlayerTag(opponent.gamerTag);
                   setFilteredPlayerId(opponent.playerId);
                 }}

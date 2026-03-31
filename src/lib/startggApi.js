@@ -72,7 +72,57 @@ export async function fetchRecentSets(playerId, accessToken) {
     }
   `;
   const data = await startggGraphQL(query, { playerId }, accessToken);
-  return data?.player?.sets?.nodes || [];
+  const sets = data?.player?.sets?.nodes || [];
+  sets._playerGamerTag = data?.player?.gamerTag || null;
+  return sets;
+}
+
+/**
+ * Fetch a specific page of sets for a player.
+ * @param {string} playerId
+ * @param {string} accessToken
+ * @param {number} page - 1-indexed page number
+ * @param {number} perPage - results per page (max ~20 to stay under complexity limit)
+ * @returns {Promise<{sets: Array, gamerTag: string|null, hasMore: boolean}>}
+ */
+export async function fetchSetsPage(playerId, accessToken, page = 1, perPage = 20) {
+  const query = `
+    query SetsPage($playerId: ID!, $perPage: Int!, $page: Int!) {
+      player(id: $playerId) {
+        id
+        gamerTag
+        sets(perPage: $perPage, page: $page) {
+          nodes {
+            id
+            displayScore
+            event { id name tournament { id name } }
+            slots {
+              entrant {
+                id
+                name
+                participants { id gamerTag }
+              }
+            }
+            games {
+              id
+              selections {
+                id
+                entrant { id }
+                character { id name }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const data = await startggGraphQL(query, { playerId, perPage, page }, accessToken);
+  const sets = data?.player?.sets?.nodes || [];
+  return {
+    sets,
+    gamerTag: data?.player?.gamerTag || null,
+    hasMore: sets.length === perPage,
+  };
 }
 
 
@@ -123,30 +173,32 @@ export async function fetchRecentOpponents(playerId, accessToken) {
   const playerGamerTag = data?.player?.gamerTag;
   const sets = data?.player?.sets?.nodes || [];
   const opponentMap = {};
+  let orderIndex = 0;
 
   for (const set of sets) {
     if (!set.slots) continue;
 
-    // Find the user's entrant ID first
+    // Find the user's entrant — try gamerTag match, then entrant name
     let userEntrantId = null;
-    for (const slot of set.slots) {
-      const hasUser = slot.entrant?.participants?.some(
-        (p) =>
-          (playerGamerTag && p.gamerTag?.toLowerCase() === playerGamerTag.toLowerCase()) ||
-          String(p.id) === String(playerId)
-      );
-      if (hasUser && slot.entrant?.id) {
-        userEntrantId = String(slot.entrant.id);
-        break;
+    if (playerGamerTag) {
+      const tagLower = playerGamerTag.toLowerCase();
+      for (const slot of set.slots) {
+        const match = slot.entrant?.participants?.some(
+          (p) => p.gamerTag?.toLowerCase() === tagLower
+        ) || slot.entrant?.name?.toLowerCase().includes(tagLower);
+        if (match && slot.entrant?.id) {
+          userEntrantId = String(slot.entrant.id);
+          break;
+        }
       }
     }
+    if (!userEntrantId) continue;
 
     // Process only opponent slots
     for (const slot of set.slots) {
       if (!slot.entrant?.id || String(slot.entrant.id) === userEntrantId) continue;
 
       const participants = slot.entrant?.participants || [];
-      // Use the first opponent participant as the key
       const opponent = participants[0];
       if (!opponent) continue;
 
@@ -157,6 +209,7 @@ export async function fetchRecentOpponents(playerId, accessToken) {
           gamerTag: opponent.gamerTag || "Unknown",
           setsPlayed: 0,
           characterCounts: {},
+          firstSeen: orderIndex++,
         };
       }
       opponentMap[key].setsPlayed += 1;
@@ -180,6 +233,7 @@ export async function fetchRecentOpponents(playerId, accessToken) {
     }
   }
 
+  // Sort by most recent first (lowest firstSeen = most recent set)
   return Object.values(opponentMap)
     .map((opp) => {
       const characters = Object.entries(opp.characterCounts)
@@ -190,10 +244,11 @@ export async function fetchRecentOpponents(playerId, accessToken) {
         gamerTag: opp.gamerTag,
         setsPlayed: opp.setsPlayed,
         characters,
+        firstSeen: opp.firstSeen,
       };
     })
-    .sort((a, b) => b.setsPlayed - a.setsPlayed)
-    .slice(0, 8);
+    .sort((a, b) => a.firstSeen - b.firstSeen)
+    .slice(0, 12);
 }
 
 /**
@@ -249,19 +304,23 @@ export async function fetchMostPlayedAgainst(playerId, accessToken) {
   for (const set of sets) {
     if (!set.slots || !set.games) continue;
 
-    // Find the user's entrant ID, then everything else is an opponent
+    // Find the user's entrant — try gamerTag match, then entrant name contains gamerTag
     let userEntrantId = null;
-    for (const slot of set.slots) {
-      const hasUser = slot.entrant?.participants?.some(
-        (p) =>
-          (playerGamerTag && p.gamerTag?.toLowerCase() === playerGamerTag.toLowerCase()) ||
-          String(p.id) === String(playerId)
-      );
-      if (hasUser && slot.entrant?.id) {
-        userEntrantId = String(slot.entrant.id);
-        break;
+    if (playerGamerTag) {
+      const tagLower = playerGamerTag.toLowerCase();
+      for (const slot of set.slots) {
+        const match = slot.entrant?.participants?.some(
+          (p) => p.gamerTag?.toLowerCase() === tagLower
+        ) || slot.entrant?.name?.toLowerCase().includes(tagLower);
+        if (match && slot.entrant?.id) {
+          userEntrantId = String(slot.entrant.id);
+          break;
+        }
       }
     }
+    // If we couldn't identify the user, skip this set entirely
+    if (!userEntrantId) continue;
+
     const opponentEntrantIds = new Set();
     for (const slot of set.slots) {
       if (slot.entrant?.id && String(slot.entrant.id) !== userEntrantId) {

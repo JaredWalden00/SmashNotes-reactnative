@@ -13,7 +13,7 @@ function dedupeByTag(opponents) {
   });
 }
 
-export default function RecentOpponentsCard({ playerId, accessToken, notes, onSelectOpponent }) {
+export default function RecentOpponentsCard({ playerId, accessToken, notes, onSelectOpponent, refreshKey }) {
   const [opponents, setOpponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,7 +34,7 @@ export default function RecentOpponentsCard({ playerId, accessToken, notes, onSe
     }
     if (playerId && accessToken) load();
     return () => { mounted = false; };
-  }, [playerId, accessToken]);
+  }, [playerId, accessToken, refreshKey]);
 
   function getNotesCountForOpponent(opponent) {
     if (!notes || !notes.length) return 0;

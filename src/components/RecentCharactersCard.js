@@ -3,7 +3,7 @@ import { View, Text, ActivityIndicator, Pressable, Image, StyleSheet } from "rea
 import { fetchMostPlayedAgainst } from "../lib/startggApi";
 import { getFighterIcon, resolveFighterName } from "../data/smashFighters";
 
-export default function RecentCharactersCard({ playerId, accessToken, onSelectCharacter, showAll, onShowAll }) {
+export default function RecentCharactersCard({ playerId, accessToken, onSelectCharacter, showAll, onShowAll, refreshKey }) {
   const [characters, setCharacters] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,7 +24,7 @@ export default function RecentCharactersCard({ playerId, accessToken, onSelectCh
     }
     if (playerId && accessToken) load();
     return () => { mounted = false; };
-  }, [playerId, accessToken]);
+  }, [playerId, accessToken, refreshKey]);
 
   return (
     <>

@@ -32,6 +32,7 @@ export default function NoteEditorModal({
   onMoveSection,
   draftPlayerTag,
   setDraftPlayerTag,
+  draftSetInfo,
   onClose,
   onSave,
 }) {
@@ -102,6 +103,20 @@ export default function NoteEditorModal({
               maxLength={40}
             />
           </View>
+          {draftSetInfo ? (
+            <View style={styles.setInfoWrap}>
+              <Text style={[styles.topCharacterLabel, isDark && styles.sectionLabelDark]}>Set</Text>
+              <View style={styles.setInfoCard}>
+                <Text style={styles.setInfoTournament}>{draftSetInfo.setTournament}</Text>
+                {draftSetInfo.setEvent ? (
+                  <Text style={styles.setInfoEvent}>{draftSetInfo.setEvent}</Text>
+                ) : null}
+                {draftSetInfo.setScore ? (
+                  <Text style={styles.setInfoScore}>{draftSetInfo.setScore}</Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {availableSections.length ? (
@@ -280,6 +295,36 @@ const styles = StyleSheet.create({
     backgroundColor: "#141C2B",
     position: "relative",
     zIndex: 320,
+  },
+  setInfoWrap: {
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    backgroundColor: "#141C2B",
+  },
+  setInfoCard: {
+    backgroundColor: "#1B2333",
+    borderRadius: 8,
+    padding: 10,
+  },
+  setInfoTournament: {
+    color: "#FF6B3D",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  setInfoEvent: {
+    color: "#96A3BD",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  setInfoScore: {
+    color: "#ECF2FF",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 4,
   },
   playerTagWrap: {
     marginBottom: 14,

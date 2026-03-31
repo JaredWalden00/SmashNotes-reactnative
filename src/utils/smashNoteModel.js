@@ -179,6 +179,8 @@ export function matchesSmashNoteSearch(note, search) {
     note.character,
     note.opponent,
     note.playerTag,
+    note.setTournament,
+    note.setEvent,
     ...Object.values(createEmptySections(note.sections)),
   ]
     .filter(Boolean)
@@ -208,6 +210,10 @@ export function normalizeNote(note) {
       sections: normalizedSections,
       playerTag: note.playerTag || null,
       startggPlayerId: note.startggPlayerId || null,
+      setId: note.setId || null,
+      setTournament: note.setTournament || null,
+      setEvent: note.setEvent || null,
+      setScore: note.setScore || null,
     };
   }
 
@@ -232,6 +238,10 @@ export function normalizeNote(note) {
         sections: normalizedSections,
         playerTag: payload.playerTag || null,
         startggPlayerId: payload.startggPlayerId || null,
+        setId: payload.setId || null,
+        setTournament: payload.setTournament || null,
+        setEvent: payload.setEvent || null,
+        setScore: payload.setScore || null,
       };
     } catch {
       // Fall back to legacy note parsing if the structured payload is invalid.
@@ -251,6 +261,10 @@ export function normalizeNote(note) {
     sections: legacySections,
     playerTag: null,
     startggPlayerId: null,
+    setId: null,
+    setTournament: null,
+    setEvent: null,
+    setScore: null,
   };
 }
 
@@ -270,6 +284,10 @@ export function serializeNoteForStorage(note) {
         sections: createEmptySections(normalized.sections),
         playerTag: normalized.playerTag || null,
         startggPlayerId: normalized.startggPlayerId || null,
+        setId: normalized.setId || null,
+        setTournament: normalized.setTournament || null,
+        setEvent: normalized.setEvent || null,
+        setScore: normalized.setScore || null,
       }),
   };
 }

@@ -214,6 +214,15 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
           <Text style={[styles.meta, isDark && styles.metaDark]}>Updated {formatDate(note.updatedAt)}</Text>
         </View>
 
+        {/* Set info */}
+        {note.setTournament ? (
+          <View style={[styles.viewSetBadge, isDark && styles.viewSetBadgeDark]}>
+            <Text style={styles.viewSetTournament}>{note.setTournament}</Text>
+            {note.setEvent ? <Text style={styles.viewSetEvent}>{note.setEvent}</Text> : null}
+            {note.setScore ? <Text style={styles.viewSetScore}>{note.setScore}</Text> : null}
+          </View>
+        ) : null}
+
         {/* Sections */}
         <View style={styles.viewSections}>
           {activeKeys.map((key) => (
@@ -877,6 +886,34 @@ const styles = StyleSheet.create({
   },
   viewSectionBodyDark: {
     color: "#D6E0F5",
+  },
+  viewSetBadge: {
+    backgroundColor: "#F4F7FB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#E6E8EB",
+  },
+  viewSetBadgeDark: {
+    backgroundColor: "#141C2B",
+    borderColor: "#2A3449",
+  },
+  viewSetTournament: {
+    color: "#FF6B3D",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  viewSetEvent: {
+    color: "#96A3BD",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  viewSetScore: {
+    color: "#ECF2FF",
+    fontSize: 13,
+    fontWeight: "600",
+    marginTop: 4,
   },
   viewActions: {
     flexDirection: "row",

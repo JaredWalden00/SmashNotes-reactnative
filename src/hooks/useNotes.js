@@ -394,6 +394,10 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
       category: opponent ? "matchup" : "general",
       playerTag: extraData?.playerTag || null,
       startggPlayerId: extraData?.startggPlayerId || null,
+      setId: extraData?.setId || null,
+      setTournament: extraData?.setTournament || null,
+      setEvent: extraData?.setEvent || null,
+      setScore: extraData?.setScore || null,
     });
     setIsEditorOpen(true);
   }
@@ -450,6 +454,10 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
               sections: nextSections,
               playerTag: draftPlayerTag || draftContext.playerTag || note.playerTag || null,
               startggPlayerId: draftContext.startggPlayerId || note.startggPlayerId || null,
+              setId: draftContext.setId || note.setId || null,
+              setTournament: draftContext.setTournament || note.setTournament || null,
+              setEvent: draftContext.setEvent || note.setEvent || null,
+              setScore: draftContext.setScore || note.setScore || null,
             });
             return upsertedNote;
           })
@@ -468,6 +476,10 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         sections: nextSections,
         playerTag: draftPlayerTag || draftContext.playerTag || null,
         startggPlayerId: draftContext.startggPlayerId || null,
+        setId: draftContext.setId || null,
+        setTournament: draftContext.setTournament || null,
+        setEvent: draftContext.setEvent || null,
+        setScore: draftContext.setScore || null,
       });
 
       setNotes((current) => {
@@ -604,6 +616,12 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     canCreateMatchupNote,
     editorContextLabel,
     draftCharacter: draftContext.character,
+    draftSetInfo: draftContext.setTournament ? {
+      setId: draftContext.setId,
+      setTournament: draftContext.setTournament,
+      setEvent: draftContext.setEvent,
+      setScore: draftContext.setScore,
+    } : null,
     isNotesLoading,
     isEditorOpen,
     draftId,
