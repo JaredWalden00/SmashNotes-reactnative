@@ -96,8 +96,25 @@ export const SMASH_FIGHTERS = [
 
 const fighterMap = new Map(SMASH_FIGHTERS.map((fighter) => [fighter.name, fighter]));
 
+// Aliases for names that differ between start.gg and our roster
+const FIGHTER_ALIASES = {
+  "Banjo-Kazooie": "Banjo & Kazooie",
+  "Banjo And Kazooie": "Banjo & Kazooie",
+  "Mr. Game & Watch": "Mr. Game and Watch",
+  "Mr. Game And Watch": "Mr. Game and Watch",
+  "R.O.B": "R.O.B.",
+  "PAC-MAN": "Pac-Man",
+  "Pac-Man": "Pac-Man",
+  "PAC MAN": "Pac-Man",
+};
+
 export function getFighterIcon(name) {
-  return fighterMap.get(name)?.icon || fighterMap.get(GENERAL_FIGHTER_NAME)?.icon;
+  const resolved = FIGHTER_ALIASES[name] || name;
+  return fighterMap.get(resolved)?.icon || fighterMap.get(GENERAL_FIGHTER_NAME)?.icon;
+}
+
+export function resolveFighterName(name) {
+  return FIGHTER_ALIASES[name] || name;
 }
 
 export function getRosterFighters() {

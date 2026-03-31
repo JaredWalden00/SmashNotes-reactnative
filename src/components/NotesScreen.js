@@ -1,4 +1,5 @@
 import RecentCharactersCard from "./RecentCharactersCard";
+import RecentOpponentsCard from "./RecentOpponentsCard";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme, useWindowDimensions } from "react-native";
 import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data/smashFighters";
@@ -6,6 +7,7 @@ import FighterTile from "./FighterTile";
 import NoteItem from "./NoteItem";
 import SelectMenuButton from "./SelectMenuButton";
 import StartGGScreen from "./StartGGScreen";
+import { matchesSmashNoteSearch } from "../utils/smashNoteModel";
 import { useStartGGSchedule } from "../hooks/useStartGG";
 
 const MAIN_NONE_VALUE = "__none__";
@@ -22,6 +24,7 @@ export default function NotesScreen({
   visibleOpponents,
   fighterNoteCounts,
   recentNotes,
+  allNotes,
   selectedCharacter,
   selectedOpponent,
   userMainCharacter,
@@ -40,6 +43,10 @@ export default function NotesScreen({
   onCreateNote,
   onQuickCreateNote,
   onSignOut,
+  startggUser,
+  startggIsAuthenticated,
+  startggLogin,
+  startggLogout,
   playerId,
   accessToken,
 }) {
@@ -48,11 +55,17 @@ export default function NotesScreen({
   const isWideLayout = width >= 980;
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [activeNavSection, setActiveNavSection] = useState("my-stuff");
+  const [filteredPlayerTag, setFilteredPlayerTag] = useState(null);
+  const [filteredPlayerId, setFilteredPlayerId] = useState(null);
+  const [showAllMatchups, setShowAllMatchups] = useState(false);
+  const [allNotesSearch, setAllNotesSearch] = useState("");
+  const [allNotesCharFilter, setAllNotesCharFilter] = useState(null);
+  const [allNotesPlayerFilter, setAllNotesPlayerFilter] = useState("");
   const { getTournamentsForDate, loading: tournamentsLoading } = useStartGGSchedule();
   const mainOptions = getRosterFighters();
   const mainMenuOptions = [
     { label: "No main", value: MAIN_NONE_VALUE },
-    ...mainOptions.map((fighter) => ({ label: fighter.name, value: fighter.name })),
+    ...mainOptions.map((fighter) => ({ label: fighter.name, value: fighter.name, icon: fighter.icon })),
   ];
   const visibleRecentNotes = recentNotes;
 
@@ -65,10 +78,200 @@ export default function NotesScreen({
     onSetMainCharacter(nextMain === MAIN_NONE_VALUE ? null : nextMain);
   }
 
+  function handleStartGGLogin() {
+    if (startggLogin) {
+      startggLogin();
+    }
+  }
+
+  function handleStartGGLogout() {
+    if (startggLogout) {
+      startggLogout();
+    }
+  }
+
   function handleCreateNoteFromStartGG(noteData) {
     // When creating a note from Start.gg data, switch back to notes view and create the note
     setActiveNavSection("my-stuff");
     onCreateNote(noteData);
+  }
+
+  function renderAccountPanel(variant) {
+    const panelStyle =
+      variant === "side"
+        ? styles.accountPanelSide
+        : variant === "character"
+          ? styles.accountPanelCharacter
+          : styles.accountPanel;
+
+    return (
+      <View style={panelStyle}>
+        {/* SmashNotes account */}
+        <View style={styles.accountPanelSection}>
+          <Text style={styles.accountPanelSectionTitle}>SmashNotes</Text>
+          <Text style={styles.accountPanelConnected}>Signed in</Text>
+        </View>
+
+        <View style={styles.accountPanelDivider} />
+
+        {/* Start.gg connection */}
+        <View style={styles.accountPanelSection}>
+          <Text style={styles.accountPanelSectionTitle}>Start.gg</Text>
+          {startggIsAuthenticated && startggUser ? (
+            <View>
+              <View style={styles.accountPanelStartggUser}>
+                <Text style={styles.accountPanelGamerTag}>
+                  {startggUser.player?.gamerTag || startggUser.name || "Connected"}
+                </Text>
+                <Text style={styles.accountPanelConnected}>Connected</Text>
+              </View>
+              <Pressable style={styles.accountPanelStartggDisconnect} onPress={handleStartGGLogout}>
+                <Text style={styles.accountPanelStartggDisconnectLabel}>Disconnect</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.accountPanelStartggHint}>
+                Connect Start.gg to see your recent characters, tournament history, and matchup data.
+              </Text>
+              <Pressable style={styles.accountPanelStartggBtn} onPress={handleStartGGLogin}>
+                <Text style={styles.accountPanelStartggBtnLabel}>Connect Start.gg</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.accountPanelDivider} />
+
+        {/* Sign out */}
+        <Pressable style={styles.accountPanelSignOut} onPress={handleSignOutFromMenu}>
+          <Text style={styles.accountPanelSignOutLabel}>Sign out</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // All Notes view
+  if (activeNavSection === "all-notes" && !selectedCharacter) {
+    const ALL_CHARS_VALUE = "__all__";
+    const charFilterOptions = [
+      { label: "All Characters", value: ALL_CHARS_VALUE },
+      ...getRosterFighters().map((f) => ({ label: f.name, value: f.name })),
+    ];
+
+    const filteredAllNotes = (allNotes || []).filter((note) => {
+      if (allNotesCharFilter && allNotesCharFilter !== ALL_CHARS_VALUE) {
+        if (note.character !== allNotesCharFilter) return false;
+      }
+      if (allNotesPlayerFilter.trim()) {
+        const pf = allNotesPlayerFilter.trim().toLowerCase();
+        const tag = (note.playerTag || "").toLowerCase();
+        if (!tag.includes(pf)) return false;
+      }
+      if (allNotesSearch.trim()) {
+        if (!matchesSmashNoteSearch(note, allNotesSearch)) return false;
+      }
+      return true;
+    });
+
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? (
+          <View style={styles.sideRail}>
+            <Text style={styles.sideBrand}>SmashNotes</Text>
+            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("my-stuff")}>
+              <Text style={styles.sideNavLabel}>My Stuff</Text>
+            </Pressable>
+            <Pressable style={styles.sidePrimaryNav}>
+              <Text style={styles.sidePrimaryNavLabel}>All Notes</Text>
+            </Pressable>
+            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("discovery")}>
+              <Text style={styles.sideNavLabel}>Start.gg</Text>
+            </Pressable>
+            <View style={styles.sideBottomNav}>
+              <View style={styles.sideAccountAnchor}>
+                <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((c) => !c)}>
+                  <Text style={styles.sideNavLabel}>Account</Text>
+                </Pressable>
+                {isAccountMenuOpen ? renderAccountPanel("side") : null}
+              </View>
+            </View>
+          </View>
+        ) : null}
+
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout ? (
+              <Pressable style={styles.backToNotesBtn} onPress={() => setActiveNavSection("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            ) : null}
+            <Text style={styles.dashboardTitle}>All Notes</Text>
+          </View>
+
+          <View style={styles.allNotesFilters}>
+            <TextInput
+              style={[styles.search, styles.searchDark]}
+              value={allNotesSearch}
+              onChangeText={setAllNotesSearch}
+              placeholder="Search all notes..."
+              placeholderTextColor="#8A93A7"
+            />
+            <View style={styles.allNotesFilterRow}>
+              <View style={styles.allNotesFilterItem}>
+                <SelectMenuButton
+                  value={allNotesCharFilter || ALL_CHARS_VALUE}
+                  options={charFilterOptions}
+                  onSelect={(v) => setAllNotesCharFilter(v === ALL_CHARS_VALUE ? null : v)}
+                  searchable
+                  searchPlaceholder="Search characters..."
+                  anchorStyle={styles.allNotesFilterAnchor}
+                  buttonStyle={styles.allNotesFilterBtn}
+                  labelStyle={styles.allNotesFilterBtnLabel}
+                  caretStyle={styles.allNotesFilterBtnCaret}
+                  dropdownStyle={styles.allNotesFilterDropdown}
+                  listStyle={styles.allNotesFilterList}
+                  itemStyle={styles.allNotesFilterDropdownItem}
+                  itemActiveStyle={styles.allNotesFilterDropdownItemActive}
+                  itemLabelStyle={styles.allNotesFilterDropdownItemLabel}
+                  maxListHeight={220}
+                />
+              </View>
+              <TextInput
+                style={[styles.allNotesPlayerInput, styles.searchDark]}
+                value={allNotesPlayerFilter}
+                onChangeText={setAllNotesPlayerFilter}
+                placeholder="Filter by player tag..."
+                placeholderTextColor="#8A93A7"
+              />
+            </View>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+            <View style={styles.dashboardCard}>
+              <View style={styles.dashboardCardHeader}>
+                <Text style={styles.dashboardCardTitle}>
+                  {allNotesCharFilter && allNotesCharFilter !== ALL_CHARS_VALUE ? allNotesCharFilter + " Notes" : "All Notes"}
+                </Text>
+                <Text style={styles.dashboardCardMeta}>{filteredAllNotes.length} note{filteredAllNotes.length !== 1 ? "s" : ""}</Text>
+              </View>
+              {filteredAllNotes.length > 0 ? (
+                <View style={styles.recentNotesWrap}>
+                  {filteredAllNotes.map((note) => (
+                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.emptyTitle, styles.emptyTitleDark]}>No notes found</Text>
+                  <Text style={[styles.emptyBody, styles.emptyBodyDark]}>Try adjusting your filters.</Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
   }
 
   // If we're showing Start.gg features, render that instead of the normal dashboard
@@ -99,13 +302,7 @@ export default function NotesScreen({
                 <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
                   <Text style={styles.sideNavLabel}>Account</Text>
                 </Pressable>
-                {isAccountMenuOpen ? (
-                  <View style={styles.accountDropdownSide}>
-                    <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
-                      <Text style={styles.accountDropdownLabel}>Sign out</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
+                {isAccountMenuOpen ? renderAccountPanel("side") : null}
               </View>
             </View>
           </View>
@@ -129,6 +326,100 @@ export default function NotesScreen({
     );
   }
 
+  // Full "Most Played Against" page
+  if (!selectedCharacter && showAllMatchups) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            <Pressable
+              style={styles.backToNotesBtn}
+              onPress={() => setShowAllMatchups(false)}
+            >
+              <Text style={styles.backToNotesBtnLabel}>← Back</Text>
+            </Pressable>
+            <Text style={styles.dashboardTitle}>Most Played Against</Text>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+            <View style={styles.dashboardCard}>
+              <RecentCharactersCard
+                playerId={playerId}
+                accessToken={accessToken}
+                showAll
+                onSelectCharacter={(characterName) => {
+                  setShowAllMatchups(false);
+                  if (onSelectCharacter) onSelectCharacter(characterName);
+                }}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    );
+  }
+
+  // Opponent notes filtered view
+  if (!selectedCharacter && filteredPlayerTag) {
+    const opponentNotes = (allNotes || []).filter(
+      (n) =>
+        (n.startggPlayerId && String(n.startggPlayerId) === String(filteredPlayerId)) ||
+        (n.playerTag && n.playerTag.toLowerCase() === filteredPlayerTag.toLowerCase())
+    );
+
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            <Pressable
+              style={styles.backToNotesBtn}
+              onPress={() => { setFilteredPlayerTag(null); setFilteredPlayerId(null); }}
+            >
+              <Text style={styles.backToNotesBtnLabel}>← Back</Text>
+            </Pressable>
+            <Text style={styles.dashboardTitle}>Notes for {filteredPlayerTag}</Text>
+            <Pressable
+              style={styles.dashboardAddNoteBtn}
+              onPress={() => {
+                onQuickCreateNote(userMainCharacter || GENERAL_FIGHTER_NAME, {
+                  playerTag: filteredPlayerTag,
+                  startggPlayerId: filteredPlayerId,
+                  opponent: filteredPlayerTag,
+                });
+              }}
+            >
+              <Text style={styles.dashboardAddNoteLabel}>+ Add Note</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+            {opponentNotes.length > 0 ? (
+              <View style={styles.dashboardCard}>
+                <View style={styles.dashboardCardHeader}>
+                  <Text style={styles.dashboardCardTitle}>Notes about {filteredPlayerTag}</Text>
+                  <Text style={styles.dashboardCardMeta}>{opponentNotes.length} note{opponentNotes.length !== 1 ? "s" : ""}</Text>
+                </View>
+                <View style={styles.recentNotesWrap}>
+                  {opponentNotes.map((note) => (
+                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
+                  ))}
+                </View>
+              </View>
+            ) : (
+              <View style={styles.dashboardCard}>
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.emptyTitle, styles.emptyTitleDark]}>No notes yet for {filteredPlayerTag}</Text>
+                  <Text style={[styles.emptyBody, styles.emptyBodyDark]}>
+                    Create a note to start tracking this opponent.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    );
+  }
+
   if (!selectedCharacter) {
     const scheduleDays = ["Today", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"];
 
@@ -140,7 +431,10 @@ export default function NotesScreen({
             <Pressable style={styles.sidePrimaryNav}>
               <Text style={styles.sidePrimaryNavLabel}>My Stuff</Text>
             </Pressable>
-            <Pressable 
+            <Pressable style={styles.sideNavItem} onPress={() => setActiveNavSection("all-notes")}>
+              <Text style={styles.sideNavLabel}>All Notes</Text>
+            </Pressable>
+            <Pressable
               style={styles.sideNavItem}
               onPress={() => setActiveNavSection("discovery")}
             >
@@ -148,23 +442,11 @@ export default function NotesScreen({
             </Pressable>
 
             <View style={styles.sideBottomNav}>
-              <Pressable style={styles.sideNavItem}>
-                <Text style={styles.sideNavLabel}>Search</Text>
-              </Pressable>
-              <Pressable style={styles.sideNavItem}>
-                <Text style={styles.sideNavLabel}>Chat</Text>
-              </Pressable>
               <View style={styles.sideAccountAnchor}>
                 <Pressable style={styles.sideNavItem} onPress={() => setIsAccountMenuOpen((current) => !current)}>
                   <Text style={styles.sideNavLabel}>Account</Text>
                 </Pressable>
-                {isAccountMenuOpen ? (
-                  <View style={styles.accountDropdownSide}>
-                    <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
-                      <Text style={styles.accountDropdownLabel}>Sign out</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
+                {isAccountMenuOpen ? renderAccountPanel("side") : null}
               </View>
             </View>
           </View>
@@ -175,12 +457,20 @@ export default function NotesScreen({
             <Text style={styles.dashboardTitle}>My Stuff</Text>
             <View style={styles.topBarActions}>
               {!isWideLayout && (
-                <Pressable
-                  style={styles.startggBtn}
-                  onPress={() => setActiveNavSection("discovery")}
-                >
-                  <Text style={styles.startggBtnLabel}>🏆 Start.gg</Text>
+                <>
+                  <Pressable
+                    style={styles.startggBtn}
+                    onPress={() => setActiveNavSection("all-notes")}
+                  >
+                    <Text style={styles.startggBtnLabel}>All Notes</Text>
+                  </Pressable>
+                  <Pressable
+                    style={styles.startggBtn}
+                    onPress={() => setActiveNavSection("discovery")}
+                  >
+                    <Text style={styles.startggBtnLabel}>Start.gg</Text>
                 </Pressable>
+                </>
               )}
               <Pressable
                 style={styles.dashboardAddNoteBtn}
@@ -193,6 +483,8 @@ export default function NotesScreen({
                 options={mainMenuOptions}
                 onSelect={handleMainMenuSelect}
                 disabled={isMainSaving}
+                searchable
+                searchPlaceholder="Search characters..."
                 onToggleOpen={(isOpen) => {
                   if (isOpen) {
                     setIsAccountMenuOpen(false);
@@ -213,13 +505,7 @@ export default function NotesScreen({
                   <Pressable style={styles.accountBtn} onPress={() => setIsAccountMenuOpen((current) => !current)}>
                     <Text style={styles.accountBtnLabel}>Account</Text>
                   </Pressable>
-                  {isAccountMenuOpen ? (
-                    <View style={styles.accountDropdown}>
-                      <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
-                        <Text style={styles.accountDropdownLabel}>Sign out</Text>
-                      </Pressable>
-                    </View>
-                  ) : null}
+                  {isAccountMenuOpen ? renderAccountPanel("dropdown") : null}
                 </View>
               ) : null}
             </View>
@@ -243,7 +529,7 @@ export default function NotesScreen({
 
               <View style={styles.recentNotesWrap}>
                 {visibleRecentNotes.map((note) => (
-                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark />
+                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
                 ))}
               </View>
 
@@ -262,6 +548,20 @@ export default function NotesScreen({
                 onSelectCharacter={(characterName) => {
                   if (onSelectCharacter) onSelectCharacter(characterName);
                   setActiveNavSection && setActiveNavSection("my-stuff");
+                }}
+                onShowAll={() => setShowAllMatchups(true)}
+              />
+            </View>
+
+            <View style={styles.dashboardCard}>
+              <RecentOpponentsCard
+                playerId={playerId}
+                accessToken={accessToken}
+                notes={allNotes}
+                onSelectOpponent={(opponent) => {
+                  setActiveNavSection("my-stuff");
+                  setFilteredPlayerTag(opponent.gamerTag);
+                  setFilteredPlayerId(opponent.playerId);
                 }}
               />
             </View>
@@ -291,13 +591,7 @@ export default function NotesScreen({
           >
             <Text style={styles.accountBtnLabel}>Account</Text>
           </Pressable>
-          {isAccountMenuOpen ? (
-            <View style={styles.accountDropdownCharacter}>
-              <Pressable style={styles.accountDropdownItem} onPress={handleSignOutFromMenu}>
-                <Text style={styles.accountDropdownLabel}>Sign out</Text>
-              </Pressable>
-            </View>
-          ) : null}
+          {isAccountMenuOpen ? renderAccountPanel("character") : null}
         </View>
       </View>
 
@@ -326,6 +620,8 @@ export default function NotesScreen({
             options={mainMenuOptions}
             onSelect={handleMainMenuSelect}
             disabled={isMainSaving}
+            searchable
+            searchPlaceholder="Search characters..."
             onToggleOpen={(isOpen) => {
               if (isOpen) {
                 setIsAccountMenuOpen(false);
@@ -691,6 +987,118 @@ const styles = StyleSheet.create({
   },
   accountDropdownLabel: {
     color: "#ECF2FF",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  // Account panel (expanded dropdown)
+  accountPanel: {
+    position: "absolute",
+    top: 42,
+    right: 0,
+    width: 280,
+    backgroundColor: "#10192C",
+    borderColor: "#2D3957",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountPanelCharacter: {
+    position: "absolute",
+    top: 42,
+    right: 0,
+    width: 280,
+    backgroundColor: "#1B2333",
+    borderColor: "#2A3449",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountPanelSide: {
+    position: "absolute",
+    bottom: 44,
+    left: 0,
+    width: 280,
+    backgroundColor: "#10192C",
+    borderColor: "#2D3957",
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    zIndex: 999,
+    elevation: 999,
+  },
+  accountPanelSection: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  accountPanelSectionTitle: {
+    color: "#8A93A7",
+    fontWeight: "800",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  accountPanelConnected: {
+    color: "#4ADE80",
+    fontWeight: "700",
+    fontSize: 11,
+  },
+  accountPanelDivider: {
+    height: 1,
+    backgroundColor: "#2D3957",
+    marginVertical: 4,
+  },
+  accountPanelStartggUser: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  accountPanelGamerTag: {
+    color: "#ECF2FF",
+    fontWeight: "800",
+    fontSize: 14,
+  },
+  accountPanelStartggDisconnect: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: "#3A242B",
+    alignSelf: "flex-start",
+  },
+  accountPanelStartggDisconnectLabel: {
+    color: "#F87171",
+    fontWeight: "700",
+    fontSize: 11,
+  },
+  accountPanelStartggHint: {
+    color: "#8A93A7",
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  accountPanelStartggBtn: {
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    backgroundColor: "#CB3F73",
+    alignItems: "center",
+  },
+  accountPanelStartggBtnLabel: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 12,
+  },
+  accountPanelSignOut: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  accountPanelSignOutLabel: {
+    color: "#F87171",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -1202,5 +1610,74 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+  allNotesFilters: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  allNotesFilterRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+  },
+  allNotesFilterItem: {
+    flex: 1,
+    zIndex: 100,
+  },
+  allNotesPlayerInput: {
+    flex: 1,
+    backgroundColor: "#1B2333",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    color: "#ECF2FF",
+    marginBottom: 12,
+  },
+  allNotesFilterAnchor: {
+    marginBottom: 12,
+    zIndex: 200,
+  },
+  allNotesFilterBtn: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    backgroundColor: "#1B2333",
+    paddingHorizontal: 12,
+  },
+  allNotesFilterBtnLabel: {
+    color: "#ECF2FF",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  allNotesFilterBtnCaret: {
+    color: "#C9D4E8",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  allNotesFilterDropdown: {
+    top: 48,
+    left: 0,
+    right: 0,
+    borderColor: "#344158",
+    backgroundColor: "#141C2B",
+    zIndex: 9999,
+  },
+  allNotesFilterList: {
+    maxHeight: 220,
+  },
+  allNotesFilterDropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  allNotesFilterDropdownItemActive: {
+    backgroundColor: "#20334B",
+  },
+  allNotesFilterDropdownItemLabel: {
+    color: "#ECF2FF",
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

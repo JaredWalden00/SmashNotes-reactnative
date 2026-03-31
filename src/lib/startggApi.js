@@ -82,30 +82,210 @@ export async function fetchRecentSets(playerId, accessToken) {
  * @param {string} accessToken
  * @returns {Promise<Array>} - Array of up to 3 character objects { id, name }
  */
-export async function fetchRecentCharacters(playerId, accessToken) {
-  // Fetch recent sets with games and selections
-  const sets = await fetchRecentSets(playerId, accessToken);
-  if (typeof console !== 'undefined') {
-    console.log('[fetchRecentCharacters] sets:', JSON.stringify(sets, null, 2));
-  }
-  const recentCharacters = [];
-  const seen = new Set();
+/**
+ * Fetch recent opponents aggregated from a player's sets.
+ * Returns up to 8 opponents sorted by sets played (descending).
+ * Each opponent includes: gamerTag, playerId, setsPlayed, characters (sorted by frequency).
+ */
+export async function fetchRecentOpponents(playerId, accessToken) {
+  // Fetch sets and also get the player's gamerTag to identify which slot is "us"
+  const query = `
+    query RecentSets($playerId: ID!) {
+      player(id: $playerId) {
+        id
+        gamerTag
+        sets(perPage: 20, page: 1) {
+          nodes {
+            id
+            displayScore
+            event { id name tournament { id name } }
+            slots {
+              entrant {
+                id
+                name
+                participants { id gamerTag }
+              }
+            }
+            games {
+              id
+              selections {
+                id
+                entrant { id }
+                character { id name }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+  const data = await startggGraphQL(query, { playerId }, accessToken);
+  const playerGamerTag = data?.player?.gamerTag;
+  const sets = data?.player?.sets?.nodes || [];
+  const opponentMap = {};
 
   for (const set of sets) {
-    if (!set.games || !Array.isArray(set.games)) continue;
+    if (!set.slots) continue;
 
-    for (const game of set.games) {
-      if (!game.selections || !Array.isArray(game.selections)) continue;
-      for (const selection of game.selections) {
-        const char = selection.character;
-        if (!char || !char.id || !char.name) continue;
-        if (!seen.has(char.id)) {
-          recentCharacters.push({ id: char.id, name: char.name });
-          seen.add(char.id);
-          if (recentCharacters.length === 3) return recentCharacters;
+    // Find the user's entrant ID first
+    let userEntrantId = null;
+    for (const slot of set.slots) {
+      const hasUser = slot.entrant?.participants?.some(
+        (p) =>
+          (playerGamerTag && p.gamerTag?.toLowerCase() === playerGamerTag.toLowerCase()) ||
+          String(p.id) === String(playerId)
+      );
+      if (hasUser && slot.entrant?.id) {
+        userEntrantId = String(slot.entrant.id);
+        break;
+      }
+    }
+
+    // Process only opponent slots
+    for (const slot of set.slots) {
+      if (!slot.entrant?.id || String(slot.entrant.id) === userEntrantId) continue;
+
+      const participants = slot.entrant?.participants || [];
+      // Use the first opponent participant as the key
+      const opponent = participants[0];
+      if (!opponent) continue;
+
+      const key = String(opponent.id);
+      if (!opponentMap[key]) {
+        opponentMap[key] = {
+          playerId: opponent.id,
+          gamerTag: opponent.gamerTag || "Unknown",
+          setsPlayed: 0,
+          characterCounts: {},
+        };
+      }
+      opponentMap[key].setsPlayed += 1;
+      if (opponent.gamerTag) {
+        opponentMap[key].gamerTag = opponent.gamerTag;
+      }
+
+      // Count characters played by this opponent in this set
+      const entrantId = String(slot.entrant.id);
+      if (set.games) {
+        for (const game of set.games) {
+          for (const sel of game.selections || []) {
+            if (sel.character?.name && String(sel.entrant?.id) === entrantId) {
+              const charName = sel.character.name;
+              opponentMap[key].characterCounts[charName] =
+                (opponentMap[key].characterCounts[charName] || 0) + 1;
+            }
+          }
         }
       }
     }
   }
-  return recentCharacters;
+
+  return Object.values(opponentMap)
+    .map((opp) => {
+      const characters = Object.entries(opp.characterCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name]) => name);
+      return {
+        playerId: opp.playerId,
+        gamerTag: opp.gamerTag,
+        setsPlayed: opp.setsPlayed,
+        characters,
+      };
+    })
+    .sort((a, b) => b.setsPlayed - a.setsPlayed)
+    .slice(0, 8);
+}
+
+/**
+ * Fetch the most played-against characters from a player's last 100 sets.
+ * Returns characters sorted by frequency (descending) with set counts.
+ */
+export async function fetchMostPlayedAgainst(playerId, accessToken) {
+  const PAGE_SIZE = 20;
+  const MAX_SETS = 100;
+  const query = `
+    query MostPlayedAgainst($playerId: ID!, $perPage: Int!, $page: Int!) {
+      player(id: $playerId) {
+        id
+        gamerTag
+        sets(perPage: $perPage, page: $page) {
+          nodes {
+            id
+            slots {
+              entrant {
+                id
+                participants { id gamerTag }
+              }
+            }
+            games {
+              id
+              selections {
+                id
+                entrant { id }
+                character { id name }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  let allSets = [];
+  let playerGamerTag = null;
+
+  for (let page = 1; allSets.length < MAX_SETS; page++) {
+    const data = await startggGraphQL(query, { playerId, perPage: PAGE_SIZE, page }, accessToken);
+    if (!playerGamerTag) playerGamerTag = data?.player?.gamerTag;
+    const nodes = data?.player?.sets?.nodes || [];
+    if (nodes.length === 0) break;
+    allSets = allSets.concat(nodes);
+    if (nodes.length < PAGE_SIZE) break;
+  }
+
+  const sets = allSets.slice(0, MAX_SETS);
+  const charCounts = {};
+
+  for (const set of sets) {
+    if (!set.slots || !set.games) continue;
+
+    // Find the user's entrant ID, then everything else is an opponent
+    let userEntrantId = null;
+    for (const slot of set.slots) {
+      const hasUser = slot.entrant?.participants?.some(
+        (p) =>
+          (playerGamerTag && p.gamerTag?.toLowerCase() === playerGamerTag.toLowerCase()) ||
+          String(p.id) === String(playerId)
+      );
+      if (hasUser && slot.entrant?.id) {
+        userEntrantId = String(slot.entrant.id);
+        break;
+      }
+    }
+    const opponentEntrantIds = new Set();
+    for (const slot of set.slots) {
+      if (slot.entrant?.id && String(slot.entrant.id) !== userEntrantId) {
+        opponentEntrantIds.add(String(slot.entrant.id));
+      }
+    }
+
+    // Count opponent characters (dedupe per set so one set = one count per character)
+    const charsThisSet = new Set();
+    for (const game of set.games) {
+      for (const sel of game.selections || []) {
+        if (sel.character?.name && sel.entrant?.id && opponentEntrantIds.has(String(sel.entrant.id))) {
+          charsThisSet.add(sel.character.name);
+        }
+      }
+    }
+    for (const charName of charsThisSet) {
+      if (!charCounts[charName]) {
+        charCounts[charName] = { name: charName, sets: 0 };
+      }
+      charCounts[charName].sets += 1;
+    }
+  }
+
+  return Object.values(charCounts)
+    .sort((a, b) => b.sets - a.sets);
 }

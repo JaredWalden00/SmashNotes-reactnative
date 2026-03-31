@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function SelectMenuButton({
   value,
@@ -7,6 +7,8 @@ export default function SelectMenuButton({
   onSelect,
   placeholder = "Select",
   disabled = false,
+  searchable = false,
+  searchPlaceholder = "Search...",
   maxListHeight = 220,
   onToggleOpen,
   anchorStyle,
@@ -20,12 +22,20 @@ export default function SelectMenuButton({
   itemLabelStyle,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const containerRef = useRef(null);
+  const searchRef = useRef(null);
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value),
     [options, value],
   );
+
+  const filteredOptions = useMemo(() => {
+    if (!searchable || !search.trim()) return options;
+    const query = search.trim().toLowerCase();
+    return options.filter((option) => option.label.toLowerCase().includes(query));
+  }, [options, search, searchable]);
 
   function toggleOpen() {
     if (disabled) {
@@ -35,10 +45,16 @@ export default function SelectMenuButton({
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
     onToggleOpen?.(nextOpen);
+    if (!nextOpen) {
+      setSearch("");
+    } else if (searchable) {
+      setTimeout(() => searchRef.current?.focus(), 50);
+    }
   }
 
   function handleSelect(nextValue) {
     setIsOpen(false);
+    setSearch("");
     onToggleOpen?.(false);
     onSelect(nextValue);
   }
@@ -52,6 +68,7 @@ export default function SelectMenuButton({
       const container = containerRef.current;
       if (container && container.contains && !container.contains(event.target)) {
         setIsOpen(false);
+        setSearch("");
         onToggleOpen?.(false);
       }
     }
@@ -70,6 +87,9 @@ export default function SelectMenuButton({
   return (
     <View ref={containerRef} style={[styles.anchor, anchorStyle]}>
       <Pressable style={[styles.button, buttonStyle, disabled && styles.buttonDisabled]} onPress={toggleOpen} disabled={disabled}>
+        {selectedOption?.icon ? (
+          <Image source={selectedOption.icon} style={styles.buttonIcon} />
+        ) : null}
         <Text style={[styles.label, labelStyle]} numberOfLines={1}>
           {selectedOption?.label || placeholder}
         </Text>
@@ -78,21 +98,43 @@ export default function SelectMenuButton({
 
       {isOpen ? (
         <View style={[styles.dropdown, dropdownStyle]}>
-          <ScrollView style={dropdownListStyle} nestedScrollEnabled>
-            {options.map((option) => (
-              <Pressable
-                key={String(option.value)}
-                style={[
-                  styles.item,
-                  itemStyle,
-                  option.value === value && styles.itemActive,
-                  option.value === value && itemActiveStyle,
-                ]}
-                onPress={() => handleSelect(option.value)}
-              >
-                <Text style={[styles.itemLabel, itemLabelStyle]}>{option.label}</Text>
-              </Pressable>
-            ))}
+          {searchable ? (
+            <View style={styles.searchWrap}>
+              <TextInput
+                ref={searchRef}
+                style={styles.searchInput}
+                value={search}
+                onChangeText={setSearch}
+                placeholder={searchPlaceholder}
+                placeholderTextColor="#5A6B84"
+                autoFocus
+              />
+            </View>
+          ) : null}
+          <ScrollView style={dropdownListStyle} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+            {filteredOptions.length ? (
+              filteredOptions.map((option) => (
+                <Pressable
+                  key={String(option.value)}
+                  style={[
+                    styles.item,
+                    itemStyle,
+                    option.value === value && styles.itemActive,
+                    option.value === value && itemActiveStyle,
+                  ]}
+                  onPress={() => handleSelect(option.value)}
+                >
+                  {option.icon ? (
+                    <Image source={option.icon} style={styles.itemIcon} />
+                  ) : null}
+                  <Text style={[styles.itemLabel, itemLabelStyle]}>{option.label}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyLabel}>No results</Text>
+              </View>
+            )}
           </ScrollView>
         </View>
       ) : null}
@@ -120,6 +162,11 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.65,
   },
+  buttonIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+  },
   label: {
     color: "#ECF2FF",
     fontWeight: "700",
@@ -145,19 +192,56 @@ const styles = StyleSheet.create({
     elevation: 9999,
     paddingVertical: 6,
   },
+  searchWrap: {
+    paddingHorizontal: 8,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2D3957",
+    marginBottom: 4,
+  },
+  searchInput: {
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#344158",
+    backgroundColor: "#141C2B",
+    paddingHorizontal: 10,
+    color: "#ECF2FF",
+    fontSize: 13,
+    fontWeight: "600",
+    outlineStyle: "none",
+  },
   list: {
     maxHeight: 220,
   },
   item: {
     paddingHorizontal: 12,
     paddingVertical: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   itemActive: {
     backgroundColor: "#1A2540",
+  },
+  itemIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
   },
   itemLabel: {
     color: "#ECF2FF",
     fontWeight: "700",
     fontSize: 12,
+  },
+  emptyWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  emptyLabel: {
+    color: "#5A6B84",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });

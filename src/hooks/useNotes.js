@@ -36,6 +36,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     opponent: null,
     category: "general",
   });
+  const [draftPlayerTag, setDraftPlayerTag] = useState("");
   const [isNotesLoading, setIsNotesLoading] = useState(false);
   const [isMainSaving, setIsMainSaving] = useState(false);
 
@@ -190,6 +191,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setIsEditorOpen(false);
     setDraftId(null);
     setTitleInput("");
+    setDraftPlayerTag("");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
@@ -352,6 +354,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
 
     setDraftId(null);
     setTitleInput("");
+    setDraftPlayerTag("");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
@@ -365,6 +368,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
   function openEditEditor(note) {
     setDraftId(note.id);
     setTitleInput(note.title || "");
+    setDraftPlayerTag(note.playerTag || "");
     setEditorSections(createEmptySections(note.sections));
     setEditorSectionKeys(getActiveSectionKeys(note.sections));
     setDraftContext({
@@ -375,17 +379,21 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setIsEditorOpen(true);
   }
 
-  function openQuickEditorForCharacter(character) {
+  function openQuickEditorForCharacter(character, extraData) {
     const nextCharacter = character || GENERAL_FIGHTER_NAME;
+    const opponent = extraData?.opponent || null;
 
     setDraftId(null);
     setTitleInput("");
+    setDraftPlayerTag(extraData?.playerTag || "");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
       character: nextCharacter,
-      opponent: null,
-      category: "general",
+      opponent,
+      category: opponent ? "matchup" : "general",
+      playerTag: extraData?.playerTag || null,
+      startggPlayerId: extraData?.startggPlayerId || null,
     });
     setIsEditorOpen(true);
   }
@@ -440,6 +448,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
               opponent: draftContext.opponent,
               category: draftContext.category,
               sections: nextSections,
+              playerTag: draftPlayerTag || draftContext.playerTag || note.playerTag || null,
+              startggPlayerId: draftContext.startggPlayerId || note.startggPlayerId || null,
             });
             return upsertedNote;
           })
@@ -456,6 +466,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         opponent: draftContext.opponent,
         category: draftContext.category,
         sections: nextSections,
+        playerTag: draftPlayerTag || draftContext.playerTag || null,
+        startggPlayerId: draftContext.startggPlayerId || null,
       });
 
       setNotes((current) => {
@@ -576,6 +588,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     visibleFighters,
     visibleOpponents,
     fighterNoteCounts,
+    notes,
     recentNotes,
     selectedCharacter,
     selectedOpponent,
@@ -596,6 +609,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     draftId,
     titleInput,
     setTitleInput,
+    draftPlayerTag,
+    setDraftPlayerTag,
     editorSections,
     editorSectionKeys,
     updateSection,

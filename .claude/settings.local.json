@@ -3,7 +3,23 @@
     "allow": [
       "Bash(grep -r \"createNativeStackNavigator\\\\|createBottomTabNavigator\\\\|NavigationContainer\\\\|@react-navigation\" /c/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/src --include=*.js)",
       "Bash(npx expo:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(node -e \"const fs=require\\(''fs''\\);[''App.js'',''src/components/NotesScreen.js'',''src/components/NoteItem.js'',''src/components/SelectMenuButton.js'',''src/components/NoteEditorModal.js'',''src/lib/startggAuth.js''].forEach\\(f=>{const c=fs.readFileSync\\(f,''utf8''\\);let b=0,p=0,k=0;for\\(let i=0;i<c.length;i++\\){const ch=c[i];if\\(ch===''{''\\)b++;if\\(ch===''}''\\)b--;if\\(ch===''\\(''\\)p++;if\\(ch===''\\)''\\)p--;if\\(ch===''[''\\)k++;if\\(ch==='']''\\)k--;}console.log\\(f+'': b=''+b+'' p=''+p+'' k=''+k+\\(b||p||k?'' ISSUE'':''''\\)\\);}\\)\")",
+      "Bash(if command:*)",
+      "Bash(then lsof:*)",
+      "Bash(elif command:*)",
+      "Bash(then netstat:*)",
+      "Bash(findstr :8081)",
+      "Bash(else echo:*)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue | Select-Object OwningProcess\")",
+      "Bash(fi)",
+      "Bash(taskkill /PID 23312 /F)",
+      "Bash(cmd //c \"taskkill /PID 23312 /F\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr :8082)",
+      "Bash(findstr :3001)",
+      "Bash(cmd //c \"taskkill /PID 5528 /F\")",
+      "Bash(node server.js)"
     ]
   }
 }

@@ -12,7 +12,13 @@ import { useStatusPopup } from "./src/hooks/useStatusPopup";
 
 export default function App() {
   // Start.gg OAuth
-  const { user: startggUser, accessToken: startggAccessToken } = useStartGGAuth();
+  const {
+    user: startggUser,
+    accessToken: startggAccessToken,
+    isAuthenticated: startggIsAuthenticated,
+    login: startggLogin,
+    logout: startggLogout,
+  } = useStartGGAuth();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
 
@@ -62,6 +68,7 @@ export default function App() {
     visibleFighters,
     visibleOpponents,
     fighterNoteCounts,
+    notes: allNotes,
     recentNotes,
     selectedCharacter,
     selectedOpponent,
@@ -82,6 +89,8 @@ export default function App() {
     draftId,
     titleInput,
     setTitleInput,
+    draftPlayerTag,
+    setDraftPlayerTag,
     editorSections,
     editorSectionKeys,
     updateSection,
@@ -163,6 +172,7 @@ export default function App() {
         visibleOpponents={visibleOpponents}
         fighterNoteCounts={fighterNoteCounts}
         recentNotes={recentNotes}
+        allNotes={allNotes}
         selectedCharacter={selectedCharacter}
         selectedOpponent={selectedOpponent}
         userMainCharacter={userMainCharacter}
@@ -181,6 +191,10 @@ export default function App() {
         onCreateNote={openNewEditor}
         onQuickCreateNote={openQuickEditorForCharacter}
         onSignOut={handleSignOut}
+        startggUser={startggUser}
+        startggIsAuthenticated={startggIsAuthenticated}
+        startggLogin={startggLogin}
+        startggLogout={startggLogout}
         playerId={startggUser?.player?.id}
         accessToken={startggAccessToken}
       />
@@ -193,6 +207,8 @@ export default function App() {
         setTitleInput={setTitleInput}
         draftCharacter={draftCharacter}
         onChangeDraftCharacter={setDraftCharacter}
+        draftPlayerTag={draftPlayerTag}
+        setDraftPlayerTag={setDraftPlayerTag}
         editorSections={editorSections}
         editorSectionKeys={editorSectionKeys}
         updateSection={updateSection}

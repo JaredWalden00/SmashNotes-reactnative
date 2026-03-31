@@ -3,7 +3,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
-const fetch = require('node-fetch');
+// Node 22+ has global fetch built-in — no import needed
 
 const app = express();
 const cors = require('cors');

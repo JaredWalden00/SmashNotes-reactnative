@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Image, Pressable, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
 import { getFighterIcon } from "../data/smashFighters";
 import {
@@ -12,18 +12,95 @@ import {
 } from "../utils/smashNoteModel";
 import LiveTextEditor from "./LiveTextEditor";
 
+function RichTextViewer({ html, isDark }) {
+  const containerRef = useRef(null);
+  const styleRef = useRef(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    if (!styleRef.current) {
+      styleRef.current = document.createElement("style");
+      el.parentNode.insertBefore(styleRef.current, el);
+    }
+    const fg = isDark ? "#D6E0F5" : "#1A2B48";
+    const codeBg = isDark ? "#1B2333" : "#F0F2F6";
+    const borderColor = isDark ? "#344158" : "#D8DDE5";
+    const quoteBorder = isDark ? "#4A5D7F" : "#D0D8E6";
+    const quoteColor = isDark ? "#8A93A7" : "#5A6B84";
+    const linkColor = isDark ? "#6B9CFF" : "#2A4D9B";
+    styleRef.current.textContent = `
+      .rich-viewer {
+        color: ${fg};
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 15px;
+        line-height: 1.7;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
+      }
+      .rich-viewer h1 { font-size: 22px; font-weight: 800; margin: 10px 0 6px; }
+      .rich-viewer h2 { font-size: 18px; font-weight: 700; margin: 8px 0 4px; }
+      .rich-viewer h3 { font-size: 16px; font-weight: 700; margin: 6px 0 4px; }
+      .rich-viewer p { margin: 4px 0; }
+      .rich-viewer a { color: ${linkColor}; }
+      .rich-viewer ul, .rich-viewer ol { padding-left: 24px; margin: 6px 0; }
+      .rich-viewer li { margin: 2px 0; }
+      .rich-viewer blockquote {
+        border-left: 3px solid ${quoteBorder};
+        padding: 6px 12px;
+        margin: 8px 0;
+        color: ${quoteColor};
+        font-style: italic;
+      }
+      .rich-viewer pre {
+        background: ${codeBg};
+        border: 1px solid ${borderColor};
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        overflow-x: auto;
+        margin: 8px 0;
+      }
+      .rich-viewer code {
+        background: ${codeBg};
+        padding: 2px 5px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+      }
+      .rich-viewer strong { font-weight: 700; }
+      .rich-viewer em { font-style: italic; }
+      .rich-viewer u { text-decoration: underline; }
+      .rich-viewer s { text-decoration: line-through; }
+    `;
+  }, [isDark]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.innerHTML = html || "";
+  }, [html]);
+
+  return (
+    <div ref={containerRef} className="rich-viewer" style={{ userSelect: "text" }} />
+  );
+}
+
 function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString();
 }
 
-export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = false }) {
+export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = false, compact = false }) {
   const isDark = forceDark || useColorScheme() === "dark";
   const summaryLines = getNoteSummaryLines(note.sections);
-  const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useState(null); // null = card, "view" = read-only, "edit" = inline edit
   const [editTitle, setEditTitle] = useState("");
   const [editSections, setEditSections] = useState({});
   const [editSectionKeys, setEditSectionKeys] = useState([]);
   const [customSectionInput, setCustomSectionInput] = useState("");
+  const isEditing = viewMode === "edit";
+  const isViewing = viewMode === "view";
 
   function startEditing() {
     setEditTitle(note.title || "");
@@ -31,11 +108,11 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
     setEditSections(sections);
     setEditSectionKeys(getActiveSectionKeys(note.sections));
     setCustomSectionInput("");
-    setIsEditing(true);
+    setViewMode("edit");
   }
 
   function cancelEditing() {
-    setIsEditing(false);
+    setViewMode(null);
     setEditTitle("");
     setEditSections({});
     setEditSectionKeys([]);
@@ -51,7 +128,7 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
     if (onSave) {
       onSave(note.id, editTitle, filteredSections);
     }
-    setIsEditing(false);
+    setViewMode(null);
   }
 
   function updateSectionValue(key, html) {
@@ -89,6 +166,83 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
       reordered.splice(target, 0, moved);
       return reordered;
     });
+  }
+
+  if (isViewing) {
+    const allSections = createEmptySections(note.sections);
+    const activeKeys = getActiveSectionKeys(note.sections);
+
+    return (
+      <View style={[styles.card, isDark && styles.cardDark]}>
+        {/* Header */}
+        <View style={styles.viewHeader}>
+          <View style={styles.viewHeaderTop}>
+            <View style={styles.matchupWrap}>
+              <Image source={getFighterIcon(note.character)} style={styles.viewIcon} />
+              {note.opponent ? (
+                <>
+                  <Text style={[styles.viewVersus, isDark && styles.versusDark]}>vs</Text>
+                  <Image source={getFighterIcon(note.opponent)} style={styles.viewIcon} />
+                </>
+              ) : null}
+            </View>
+            <Pressable style={styles.viewCloseBtn} onPress={() => setViewMode(null)}>
+              <Text style={styles.viewCloseBtnLabel}>Close</Text>
+            </Pressable>
+          </View>
+          <Text style={[styles.viewTitle, isDark && styles.titleDark]}>{note.title || "Untitled note"}</Text>
+          <View style={styles.viewMetaRow}>
+            <Text style={[styles.viewContext, isDark && styles.contextLabelDark]}>
+              {note.opponent ? `${note.character} vs ${note.opponent}` : note.character}
+            </Text>
+            {note.playerTag ? (
+              <View style={[styles.viewPlayerChip, isDark && styles.viewPlayerChipDark]}>
+                <Text style={[styles.viewPlayerChipLabel, isDark && styles.viewPlayerChipLabelDark]}>{note.playerTag}</Text>
+              </View>
+            ) : null}
+            <View
+              style={[
+                styles.typeChip,
+                note.opponent ? styles.matchupChip : styles.generalChip,
+                isDark && styles.typeChipDark,
+                isDark && (note.opponent ? styles.matchupChipDark : styles.generalChipDark),
+              ]}
+            >
+              <Text style={[styles.typeChipLabel, isDark && styles.typeChipLabelDark]}>{note.opponent ? "Matchup" : "General"}</Text>
+            </View>
+          </View>
+          <Text style={[styles.meta, isDark && styles.metaDark]}>Updated {formatDate(note.updatedAt)}</Text>
+        </View>
+
+        {/* Sections */}
+        <View style={styles.viewSections}>
+          {activeKeys.map((key) => (
+            <View key={key} style={[styles.viewSection, isDark && styles.viewSectionDark]}>
+              <Text style={[styles.viewSectionLabel, isDark && styles.viewSectionLabelDark]}>
+                {getSectionLabel(key)}
+              </Text>
+              <RichTextViewer html={allSections[key] || ""} isDark={isDark} />
+            </View>
+          ))}
+        </View>
+
+        {/* Actions */}
+        <View style={styles.viewActions}>
+          <Pressable
+            style={[styles.actionBtn, styles.editBtn, isDark && styles.editBtnDark]}
+            onPress={() => { setViewMode(null); startEditing(); }}
+          >
+            <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>Edit</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.actionBtn, styles.deleteBtn, isDark && styles.deleteBtnDark]}
+            onPress={() => onDelete(note.id)}
+          >
+            <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>Delete</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
   }
 
   if (isEditing) {
@@ -228,7 +382,7 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
 
   return (
     <View style={[styles.card, isDark && styles.cardDark]}>
-      <Pressable style={styles.contentWrap} onPress={() => (onSave ? startEditing() : onEdit(note))}>
+      <Pressable style={styles.contentWrap} onPress={() => setViewMode("view")}>
         <View style={styles.headerRow}>
           <View style={styles.matchupWrap}>
             <Image source={getFighterIcon(note.character)} style={styles.icon} />
@@ -259,7 +413,7 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
           </View>
         </View>
 
-        {summaryLines.length ? (
+        {!compact && (summaryLines.length ? (
           <View style={styles.summaryWrap}>
             {summaryLines.map(([label, value]) => (
                 <Text key={label} numberOfLines={2} style={[styles.body, isDark && styles.bodyDark]}>
@@ -272,12 +426,18 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
           <Text numberOfLines={3} style={[styles.body, isDark && styles.bodyDark]}>
             No content
           </Text>
-        )}
+        ))}
 
         <Text style={[styles.meta, isDark && styles.metaDark]}>Updated {formatDate(note.updatedAt)}</Text>
       </Pressable>
 
       <View style={styles.actions}>
+        <Pressable
+          style={[styles.actionBtn, styles.viewBtn, isDark && styles.viewBtnDark]}
+          onPress={() => setViewMode("view")}
+        >
+          <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>View</Text>
+        </Pressable>
         <Pressable
           style={[styles.actionBtn, styles.editBtn, isDark && styles.editBtnDark]}
           onPress={() => (onSave ? startEditing() : onEdit(note))}
@@ -418,6 +578,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 10,
+  },
+  viewBtn: {
+    backgroundColor: "#E0EDFF",
+  },
+  viewBtnDark: {
+    backgroundColor: "#1E3254",
   },
   editBtn: {
     backgroundColor: "#D5E8FF",
@@ -611,5 +777,112 @@ const styles = StyleSheet.create({
   },
   saveEditLabel: {
     color: "#FFFFFF",
+  },
+  // View mode styles
+  viewHeader: {
+    marginBottom: 16,
+  },
+  viewHeaderTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  viewIcon: {
+    width: 44,
+    height: 44,
+  },
+  viewVersus: {
+    marginHorizontal: 6,
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#6B778C",
+  },
+  viewCloseBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: "#2A3449",
+  },
+  viewCloseBtnLabel: {
+    color: "#C9D4E8",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  viewTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1A2B48",
+    marginBottom: 8,
+  },
+  viewMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 6,
+  },
+  viewContext: {
+    fontSize: 13,
+    color: "#6B778C",
+    fontWeight: "600",
+  },
+  viewPlayerChip: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: "#E8F0FE",
+  },
+  viewPlayerChipDark: {
+    backgroundColor: "#1E3254",
+  },
+  viewPlayerChipLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#2A4D9B",
+  },
+  viewPlayerChipLabelDark: {
+    color: "#6B9CFF",
+  },
+  viewSections: {
+    gap: 14,
+    marginBottom: 16,
+  },
+  viewSection: {
+    backgroundColor: "#F4F7FB",
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#E6E8EB",
+  },
+  viewSectionDark: {
+    backgroundColor: "#141C2B",
+    borderColor: "#2A3449",
+  },
+  viewSectionLabel: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#20304E",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  viewSectionLabelDark: {
+    color: "#96A3BD",
+  },
+  viewSectionBody: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: "#1A2B48",
+  },
+  viewSectionBodyDark: {
+    color: "#D6E0F5",
+  },
+  viewActions: {
+    flexDirection: "row",
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#E6E8EB",
+    paddingTop: 14,
   },
 });

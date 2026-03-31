@@ -178,6 +178,7 @@ export function matchesSmashNoteSearch(note, search) {
     note.title,
     note.character,
     note.opponent,
+    note.playerTag,
     ...Object.values(createEmptySections(note.sections)),
   ]
     .filter(Boolean)
@@ -205,6 +206,8 @@ export function normalizeNote(note) {
       opponent,
       category: note.category || (opponent ? "matchup" : "general"),
       sections: normalizedSections,
+      playerTag: note.playerTag || null,
+      startggPlayerId: note.startggPlayerId || null,
     };
   }
 
@@ -227,6 +230,8 @@ export function normalizeNote(note) {
         opponent,
         category: payload.category || (opponent ? "matchup" : "general"),
         sections: normalizedSections,
+        playerTag: payload.playerTag || null,
+        startggPlayerId: payload.startggPlayerId || null,
       };
     } catch {
       // Fall back to legacy note parsing if the structured payload is invalid.
@@ -244,6 +249,8 @@ export function normalizeNote(note) {
     opponent: null,
     category: "general",
     sections: legacySections,
+    playerTag: null,
+    startggPlayerId: null,
   };
 }
 
@@ -261,6 +268,8 @@ export function serializeNoteForStorage(note) {
         opponent: normalized.opponent,
         category: normalized.category,
         sections: createEmptySections(normalized.sections),
+        playerTag: normalized.playerTag || null,
+        startggPlayerId: normalized.startggPlayerId || null,
       }),
   };
 }

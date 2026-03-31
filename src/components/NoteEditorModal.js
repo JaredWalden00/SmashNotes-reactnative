@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { SMASH_FIGHTERS } from "../data/smashFighters";
 import { NOTE_SECTION_OPTIONS, getSectionLabel, getSectionPlaceholder } from "../utils/smashNoteModel";
-import LiveTextEditor from "./LiveTextEditor";
 import SelectMenuButton from "./SelectMenuButton";
 
 export default function NoteEditorModal({
@@ -31,6 +30,8 @@ export default function NoteEditorModal({
   onAddCustomSection,
   onRemoveSection,
   onMoveSection,
+  draftPlayerTag,
+  setDraftPlayerTag,
   onClose,
   onSave,
 }) {
@@ -90,6 +91,17 @@ export default function NoteEditorModal({
               maxListHeight={220}
             />
           </View>
+          <View style={styles.playerTagWrap}>
+            <Text style={[styles.topCharacterLabel, isDark && styles.sectionLabelDark]}>Player Tag</Text>
+            <TextInput
+              style={[styles.playerTagInput, isDark && styles.modalHeaderInputDark]}
+              value={draftPlayerTag}
+              onChangeText={setDraftPlayerTag}
+              placeholder="e.g. MkLeo, Sparg0"
+              placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
+              maxLength={40}
+            />
+          </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {availableSections.length ? (
@@ -132,48 +144,52 @@ export default function NoteEditorModal({
               </View>
             </View>
 
-            {activeSections.map((section, index) => (
-              <View key={section.key} style={styles.sectionBlock}>
-                <View style={styles.sectionHeaderRow}>
-                  <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{section.label}</Text>
-                  <View style={styles.sectionActionsRow}>
-                    <Pressable
-                      style={[styles.orderSectionBtn, index === 0 && styles.orderSectionBtnDisabled, isDark && styles.orderSectionBtnDark]}
-                      onPress={() => onMoveSection(section.key, "up")}
-                      disabled={index === 0}
-                    >
-                      <Text style={[styles.orderSectionLabel, isDark && styles.orderSectionLabelDark]}>Up</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.orderSectionBtn,
-                        index === activeSections.length - 1 && styles.orderSectionBtnDisabled,
-                        isDark && styles.orderSectionBtnDark,
-                      ]}
-                      onPress={() => onMoveSection(section.key, "down")}
-                      disabled={index === activeSections.length - 1}
-                    >
-                      <Text style={[styles.orderSectionLabel, isDark && styles.orderSectionLabelDark]}>Down</Text>
-                    </Pressable>
-                    {editorSectionKeys.length > 1 ? (
+            {activeSections.map((section, index) => {
+              return (
+                <View key={section.key} style={styles.sectionBlock}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>{section.label}</Text>
+                    <View style={styles.sectionActionsRow}>
                       <Pressable
-                        style={[styles.removeSectionBtn, isDark && styles.removeSectionBtnDark]}
-                        onPress={() => onRemoveSection(section.key)}
+                        style={[styles.orderSectionBtn, index === 0 && styles.orderSectionBtnDisabled, isDark && styles.orderSectionBtnDark]}
+                        onPress={() => onMoveSection(section.key, "up")}
+                        disabled={index === 0}
                       >
-                        <Text style={styles.removeSectionLabel}>Remove</Text>
+                        <Text style={[styles.orderSectionLabel, isDark && styles.orderSectionLabelDark]}>Up</Text>
                       </Pressable>
-                    ) : null}
+                      <Pressable
+                        style={[
+                          styles.orderSectionBtn,
+                          index === activeSections.length - 1 && styles.orderSectionBtnDisabled,
+                          isDark && styles.orderSectionBtnDark,
+                        ]}
+                        onPress={() => onMoveSection(section.key, "down")}
+                        disabled={index === activeSections.length - 1}
+                      >
+                        <Text style={[styles.orderSectionLabel, isDark && styles.orderSectionLabelDark]}>Down</Text>
+                      </Pressable>
+                      {editorSectionKeys.length > 1 ? (
+                        <Pressable
+                          style={[styles.removeSectionBtn, isDark && styles.removeSectionBtnDark]}
+                          onPress={() => onRemoveSection(section.key)}
+                        >
+                          <Text style={styles.removeSectionLabel}>Remove</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
                   </View>
+                  <TextInput
+                    style={[styles.inputBody, isDark && styles.inputDark]}
+                    value={editorSections[section.key] || ""}
+                    onChangeText={(text) => updateSection(section.key, text)}
+                    placeholder={section.placeholder}
+                    placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
+                    multiline
+                    textAlignVertical="top"
+                  />
                 </View>
-
-                <LiveTextEditor
-                  value={editorSections[section.key] || ""}
-                  onChange={(value) => updateSection(section.key, value)}
-                  placeholder={section.placeholder}
-                  minHeight={110}
-                />
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
 
           <View style={styles.modalActions}>
@@ -264,6 +280,25 @@ const styles = StyleSheet.create({
     backgroundColor: "#141C2B",
     position: "relative",
     zIndex: 320,
+  },
+  playerTagWrap: {
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    backgroundColor: "#141C2B",
+  },
+  playerTagInput: {
+    borderWidth: 1,
+    borderColor: "#D8DDE5",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    color: "#1A2B48",
+    fontSize: 15,
+    outlineStyle: "none",
   },
   topCharacterLabel: {
     marginBottom: 6,

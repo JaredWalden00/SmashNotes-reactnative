@@ -35,30 +35,57 @@ export class StartGGAuth {
   // Exchange authorization code for access token (following Start.gg documentation)
   async exchangeCodeForToken(code) {
     try {
-      // Get the code_verifier from the AuthRequest instance
-      const codeVerifier = this._lastCodeVerifier || null;
-      // POST the code and code_verifier to your backend endpoint
-      const response = await fetch('http://localhost:3001/api/startgg/exchange', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code: code,
-          redirect_uri: this.redirectUri,
-          code_verifier: codeVerifier,
-        }),
-      });
+      // Restore code_verifier — may be lost after a full-page redirect on web
+      let codeVerifier = this._lastCodeVerifier || null;
+      if (!codeVerifier) {
+        codeVerifier = await AsyncStorage.getItem('startgg_code_verifier');
+      }
 
-      const data = await response.json();
-      console.log('Backend token exchange response:', data);
+      // Try the backend proxy first, fall back to direct exchange
+      let data;
+      try {
+        const backendResponse = await fetch('http://localhost:3001/api/startgg/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            redirect_uri: this.redirectUri,
+            code_verifier: codeVerifier,
+          }),
+        });
+        data = await backendResponse.json();
+        console.log('Backend token exchange response:', data);
+
+        // If backend returned an error, fall through to direct exchange
+        if (data.error || !data.access_token) {
+          throw new Error(data.error || 'No access token from backend');
+        }
+      } catch (backendError) {
+        console.log('Backend proxy failed, exchanging directly with Start.gg:', backendError.message);
+        const directResponse = await fetch(START_GG_TOKEN_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            grant_type: 'authorization_code',
+            client_id: this.clientId,
+            client_secret: this.clientSecret,
+            code,
+            redirect_uri: this.redirectUri,
+            code_verifier: codeVerifier,
+          }),
+        });
+        data = await directResponse.json();
+        console.log('Direct token exchange response:', data);
+      }
 
       if (data.access_token) {
         // Store tokens securely
         await AsyncStorage.setItem('startgg_access_token', data.access_token);
         await AsyncStorage.setItem('startgg_refresh_token', data.refresh_token || '');
-        await AsyncStorage.setItem('startgg_token_expires', 
+        await AsyncStorage.setItem('startgg_token_expires',
           String(Date.now() + (data.expires_in * 1000)));
+        // Clean up code verifier
+        await AsyncStorage.removeItem('startgg_code_verifier');
         return data.access_token;
       }
 
@@ -182,19 +209,36 @@ export function useStartGGAuth() {
     discovery
   );
 
-  // Save code_verifier for token exchange
+  // Save code_verifier for token exchange (persist to AsyncStorage so it
+  // survives full-page redirects on web)
   useEffect(() => {
     if (request && request.codeVerifier) {
       authService._lastCodeVerifier = request.codeVerifier;
+      AsyncStorage.setItem('startgg_code_verifier', request.codeVerifier).catch(() => {});
     }
   }, [request]);
 
-  // Check authentication status on mount
+  // Check authentication status on mount + handle web OAuth redirect
   useEffect(() => {
+    // On web, expo-auth-session does a full page redirect.
+    // When the page reloads at /auth/callback?code=..., the useAuthRequest
+    // response never fires because React state was lost. We need to grab
+    // the code from the URL ourselves.
+    if (typeof window !== 'undefined' && window.location) {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code) {
+        // Clean the URL so a page refresh doesn't re-trigger
+        window.history.replaceState({}, '', window.location.pathname);
+        handleAuthSuccess(code);
+        return; // skip normal checkAuthStatus — handleAuthSuccess will set state
+      }
+    }
+
     checkAuthStatus();
   }, []);
 
-  // Handle OAuth response
+  // Handle OAuth response (native platforms where useAuthRequest returns inline)
   useEffect(() => {
   console.log('OAuth response:', response);
   if (response?.type === 'success') {
