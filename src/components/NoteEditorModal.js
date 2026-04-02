@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SMASH_FIGHTERS } from "../data/smashFighters";
 import { NOTE_SECTION_OPTIONS, getSectionLabel, getSectionPlaceholder } from "../utils/smashNoteModel";
+import LiveTextEditor from "./LiveTextEditor";
 import SelectMenuButton from "./SelectMenuButton";
 
 export default function NoteEditorModal({
@@ -33,6 +34,8 @@ export default function NoteEditorModal({
   draftPlayerTag,
   setDraftPlayerTag,
   draftSetInfo,
+  draftVodUrl,
+  setDraftVodUrl,
   onClose,
   onSave,
 }) {
@@ -117,6 +120,14 @@ export default function NoteEditorModal({
               </View>
             </View>
           ) : null}
+          {draftVodUrl ? (
+            <View style={styles.setInfoWrap}>
+              <Text style={[styles.topCharacterLabel, isDark && styles.sectionLabelDark]}>VOD</Text>
+              <View style={styles.setInfoCard}>
+                <Text style={styles.setInfoTournament}>🎬 {draftVodUrl}</Text>
+              </View>
+            </View>
+          ) : null}
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {availableSections.length ? (
@@ -193,14 +204,11 @@ export default function NoteEditorModal({
                       ) : null}
                     </View>
                   </View>
-                  <TextInput
-                    style={[styles.inputBody, isDark && styles.inputDark]}
+                  <LiveTextEditor
                     value={editorSections[section.key] || ""}
-                    onChangeText={(text) => updateSection(section.key, text)}
+                    onChange={(html) => updateSection(section.key, html)}
                     placeholder={section.placeholder}
-                    placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
-                    multiline
-                    textAlignVertical="top"
+                    minHeight={140}
                   />
                 </View>
               );

@@ -37,6 +37,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     category: "general",
   });
   const [draftPlayerTag, setDraftPlayerTag] = useState("");
+  const [draftVodUrl, setDraftVodUrl] = useState("");
   const [isNotesLoading, setIsNotesLoading] = useState(false);
   const [isMainSaving, setIsMainSaving] = useState(false);
 
@@ -192,6 +193,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(null);
     setTitleInput("");
     setDraftPlayerTag("");
+    setDraftVodUrl("");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
@@ -355,6 +357,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(null);
     setTitleInput("");
     setDraftPlayerTag("");
+    setDraftVodUrl("");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
@@ -369,6 +372,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(note.id);
     setTitleInput(note.title || "");
     setDraftPlayerTag(note.playerTag || "");
+    setDraftVodUrl(note.vodUrl || "");
     setEditorSections(createEmptySections(note.sections));
     setEditorSectionKeys(getActiveSectionKeys(note.sections));
     setDraftContext({
@@ -386,6 +390,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setDraftId(null);
     setTitleInput("");
     setDraftPlayerTag(extraData?.playerTag || "");
+    setDraftVodUrl(extraData?.vodUrl || "");
     setEditorSections(createEmptySections());
     setEditorSectionKeys(["overview"]);
     setDraftContext({
@@ -398,6 +403,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
       setTournament: extraData?.setTournament || null,
       setEvent: extraData?.setEvent || null,
       setScore: extraData?.setScore || null,
+      vodUrl: extraData?.vodUrl || null,
     });
     setIsEditorOpen(true);
   }
@@ -458,6 +464,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
               setTournament: draftContext.setTournament || note.setTournament || null,
               setEvent: draftContext.setEvent || note.setEvent || null,
               setScore: draftContext.setScore || note.setScore || null,
+              vodUrl: draftVodUrl || draftContext.vodUrl || note.vodUrl || null,
             });
             return upsertedNote;
           })
@@ -480,6 +487,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         setTournament: draftContext.setTournament || null,
         setEvent: draftContext.setEvent || null,
         setScore: draftContext.setScore || null,
+        vodUrl: draftVodUrl || draftContext.vodUrl || null,
       });
 
       setNotes((current) => {
@@ -546,6 +554,52 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
         );
       });
     }
+  }
+
+  function createNoteSilent(noteData) {
+    const now = Date.now();
+    const upsertedNote = normalizeNote({
+      id: buildId(),
+      title: buildNoteTitle(
+        noteData.character || GENERAL_FIGHTER_NAME,
+        noteData.opponent || null,
+        noteData.title || ""
+      ),
+      updatedAt: now,
+      character: noteData.character || GENERAL_FIGHTER_NAME,
+      opponent: noteData.opponent || null,
+      category: noteData.opponent ? "matchup" : "general",
+      sections: createEmptySections(noteData.sections || { overview: noteData.content || "" }),
+      playerTag: noteData.playerTag || null,
+      startggPlayerId: noteData.startggPlayerId || null,
+      setId: noteData.setId || null,
+      setTournament: noteData.setTournament || null,
+      setEvent: noteData.setEvent || null,
+      setScore: noteData.setScore || null,
+      vodUrl: noteData.vodUrl || null,
+    });
+
+    let nextNotes;
+    setNotes((current) => {
+      nextNotes = [upsertedNote, ...current].sort((a, b) => b.updatedAt - a.updatedAt);
+      return nextNotes;
+    });
+
+    if (nextNotes && upsertedNote) {
+      persistAndSync(nextNotes, upsertedNote, null).catch((error) => {
+        if (isRateLimitError(error)) {
+          showServerOverloadedPopup();
+          return;
+        }
+        showStatusPopup(
+          "error",
+          "Save failed",
+          "Your note was saved locally but cloud sync failed."
+        );
+      });
+    }
+
+    showStatusPopup("success", "Note saved", upsertedNote.title);
   }
 
   function removeNote(noteId) {
@@ -629,6 +683,8 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     setTitleInput,
     draftPlayerTag,
     setDraftPlayerTag,
+    draftVodUrl,
+    setDraftVodUrl,
     editorSections,
     editorSectionKeys,
     updateSection,
@@ -639,6 +695,7 @@ export function useNotes({ userId, showStatusPopup, showServerOverloadedPopup })
     moveEditorSection,
     openNewEditor,
     openQuickEditorForCharacter,
+    createNoteSilent,
     openEditEditor,
     closeEditor,
     saveDraft,

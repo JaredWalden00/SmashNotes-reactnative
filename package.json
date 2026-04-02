@@ -8,11 +8,15 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "docker:web:build": "docker compose build expo-web",
-    "docker:web:up": "docker compose up expo-web",
-    "docker:web:down": "docker compose down",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up",
+    "docker:down": "docker compose down",
+    "docker:restart": "docker compose down && docker compose up --build",
+    "docker:logs": "docker compose logs -f",
     "dev:docker:up": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/dev-docker-up.ps1",
     "dev:docker:down": "docker compose down && npx supabase stop",
+    "server": "cd server && node server.js",
+    "scrape:framedata": "node scripts/scrapeFrameData.js",
     "db:init": "npx supabase init",
     "db:link": "npx supabase link",
     "db:migration:new": "npx supabase migration new",
@@ -37,6 +41,7 @@
     "react-native-web": "^0.21.0"
   },
   "devDependencies": {
+    "cheerio": "^1.2.0",
     "supabase": "^2.83.0"
   }
 }

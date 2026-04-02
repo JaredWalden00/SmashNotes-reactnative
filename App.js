@@ -92,6 +92,8 @@ export default function App() {
     setTitleInput,
     draftPlayerTag,
     setDraftPlayerTag,
+    draftVodUrl,
+    setDraftVodUrl,
     editorSections,
     editorSectionKeys,
     updateSection,
@@ -102,6 +104,7 @@ export default function App() {
     moveEditorSection,
     openNewEditor,
     openQuickEditorForCharacter,
+    createNoteSilent,
     openEditEditor,
     closeEditor,
     saveDraft,
@@ -191,6 +194,7 @@ export default function App() {
         onSaveInlineEdit={saveInlineEdit}
         onCreateNote={openNewEditor}
         onQuickCreateNote={openQuickEditorForCharacter}
+        onCreateNoteSilent={createNoteSilent}
         onSignOut={handleSignOut}
         startggUser={startggUser}
         startggIsAuthenticated={startggIsAuthenticated}
@@ -213,6 +217,8 @@ export default function App() {
         draftPlayerTag={draftPlayerTag}
         setDraftPlayerTag={setDraftPlayerTag}
         draftSetInfo={draftSetInfo}
+        draftVodUrl={draftVodUrl}
+        setDraftVodUrl={setDraftVodUrl}
         editorSections={editorSections}
         editorSectionKeys={editorSectionKeys}
         updateSection={updateSection}

@@ -1,4 +1,5 @@
 import { useRef, useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   View,
   StyleSheet,
@@ -320,8 +321,26 @@ function getEditorStyles(isDark) {
     .live-editor em { font-style: italic; }
     .live-editor u { text-decoration: underline; }
     .live-editor s { text-decoration: line-through; }
+    .live-editor .fd-badge { cursor: grab; }
+    .live-editor .fd-badge:active { cursor: grabbing; opacity: 0.7; }
+    .live-editor .fd-drop-indicator {
+      display: inline-block;
+      width: 2px;
+      height: 1.2em;
+      background: #FF6B3D;
+      vertical-align: middle;
+      margin: 0 1px;
+      border-radius: 1px;
+      animation: fd-blink 0.8s ease-in-out infinite;
+    }
+    @keyframes fd-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
   `;
 }
+
+import { searchMoves, formatMoveAsHtml, formatMoveDetailedHtml, getFrameDataCharacters } from "../utils/frameData";
 
 export default function LiveTextEditor({
   value,
@@ -331,10 +350,20 @@ export default function LiveTextEditor({
   style,
   toolbarStyle,
   editorStyle,
+  character,
 }) {
   const isDark = useColorScheme() === "dark";
+  const [fdOpen, setFdOpen] = useState(false);
+  const [fdSearch, setFdSearch] = useState("");
+  const [fdCharacter, setFdCharacter] = useState(character || "");
+  const [fdFormat, setFdFormat] = useState("compact"); // "compact" or "detailed"
+  const [fdHover, setFdHover] = useState(false);
+  const [fdTooltipPos, setFdTooltipPos] = useState({ top: 0, left: 0 });
+  const fdBtnRef = useRef(null);
+  const fdResults = fdCharacter && fdSearch.trim() ? searchMoves(fdCharacter, fdSearch.trim()).slice(0, 8) : [];
   const editorRef = useRef(null);
   const styleRef = useRef(null);
+  const savedSelectionRef = useRef(null);
   const [activeStates, setActiveStates] = useState({});
   const isInternalChange = useRef(false);
   const pollRef = useRef(null);
@@ -359,6 +388,18 @@ export default function LiveTextEditor({
     if (value && !el.innerHTML) {
       el.innerHTML = value;
     }
+  }, []);
+
+  // Continuously save cursor position whenever selection changes inside the editor
+  useEffect(() => {
+    function saveSelection() {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+        savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+      }
+    }
+    document.addEventListener("selectionchange", saveSelection);
+    return () => document.removeEventListener("selectionchange", saveSelection);
   }, []);
 
   // Poll active formatting state
@@ -434,6 +475,105 @@ export default function LiveTextEditor({
     if (e.key === "Tab") {
       e.preventDefault();
       document.execCommand("insertText", false, "    ");
+    }
+  }, []);
+
+  // Drag and drop for FD badges
+  const draggedBadgeRef = useRef(null);
+
+  const handleDragStart = useCallback((e) => {
+    const badge = e.target.closest(".fd-badge");
+    if (!badge) return;
+    draggedBadgeRef.current = badge;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/html", badge.outerHTML);
+    badge.style.opacity = "0.4";
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    if (!draggedBadgeRef.current) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+
+    // Show drop indicator at caret position
+    const el = editorRef.current;
+    if (!el) return;
+
+    // Remove any existing drop indicators
+    el.querySelectorAll(".fd-drop-indicator").forEach((ind) => ind.remove());
+
+    // Get caret position from mouse coordinates
+    let range;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+
+    if (range && el.contains(range.startContainer)) {
+      const indicator = document.createElement("span");
+      indicator.className = "fd-drop-indicator";
+      indicator.contentEditable = "false";
+      range.insertNode(indicator);
+    }
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    const badge = draggedBadgeRef.current;
+    if (!badge) return;
+    e.preventDefault();
+
+    const el = editorRef.current;
+    if (!el) return;
+
+    // Remove drop indicators
+    el.querySelectorAll(".fd-drop-indicator").forEach((ind) => ind.remove());
+
+    // Get drop position
+    let range;
+    if (document.caretRangeFromPoint) {
+      range = document.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (document.caretPositionFromPoint) {
+      const pos = document.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+
+    if (range && el.contains(range.startContainer)) {
+      // Remove badge from old position
+      badge.remove();
+      // Insert at new position
+      range.insertNode(badge);
+      // Move cursor after the badge
+      range.setStartAfter(badge);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    badge.style.opacity = "1";
+    draggedBadgeRef.current = null;
+
+    if (onChange) onChange(el.innerHTML);
+  }, [onChange]);
+
+  const handleDragEnd = useCallback((e) => {
+    const el = editorRef.current;
+    if (el) {
+      el.querySelectorAll(".fd-drop-indicator").forEach((ind) => ind.remove());
+    }
+    if (draggedBadgeRef.current) {
+      draggedBadgeRef.current.style.opacity = "1";
+      draggedBadgeRef.current = null;
     }
   }, []);
 
@@ -515,7 +655,196 @@ export default function LiveTextEditor({
             </Pressable>
           );
         })}
+
+        {/* Frame Data button with hover preview */}
+        <View style={[styles.separator, isDark && styles.separatorDark]} />
+        <View style={styles.fdBtnWrap}>
+          <Pressable
+            ref={fdBtnRef}
+            style={[styles.toolbarBtn, fdOpen && styles.toolbarBtnActive, fdOpen && isDark && styles.toolbarBtnActiveDark]}
+            onPress={() => {
+              if (!fdOpen) {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
+                  savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
+                }
+              }
+              setFdOpen(!fdOpen);
+              setFdSearch("");
+            }}
+            onHoverIn={() => {
+              setFdHover(true);
+              // Calculate tooltip position from button
+              try {
+                const node = fdBtnRef.current;
+                const el = node?.getBoundingClientRect ? node : node?._nativeTag ? null : node;
+                if (el && el.getBoundingClientRect) {
+                  const rect = el.getBoundingClientRect();
+                  setFdTooltipPos({ top: rect.bottom + 6, left: Math.max(8, rect.right - 280) });
+                }
+              } catch (e) {}
+            }}
+            onHoverOut={() => setFdHover(false)}
+          >
+            <Text style={[styles.toolbarBtnLabel, isDark && styles.toolbarBtnLabelDark, { fontSize: 10, fontWeight: "800" }, fdOpen && styles.toolbarBtnLabelActive]}>FD</Text>
+          </Pressable>
+          {fdHover && !fdOpen && typeof document !== "undefined" && createPortal(
+            <div style={{
+              position: "fixed",
+              top: fdTooltipPos.top,
+              left: fdTooltipPos.left,
+              width: 280,
+              backgroundColor: isDark ? "#1B2333" : "#F8FAFD",
+              borderRadius: 10,
+              padding: 12,
+              border: `1px solid ${isDark ? "#2A3449" : "#D8DDE5"}`,
+              zIndex: 999999,
+              boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.5)" : "0 4px 20px rgba(0,0,0,0.25)",
+              pointerEvents: "none",
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            }}>
+              <div style={{ color: "#FF6B3D", fontSize: 13, fontWeight: 800, marginBottom: 4 }}>Insert Frame Data</div>
+              <div style={{ color: "#96A3BD", fontSize: 11, lineHeight: "16px", marginBottom: 8 }}>Search a character's moves and insert frame data into your note.</div>
+              <div style={{ height: 1, backgroundColor: isDark ? "#2A3449" : "#D8DDE5", marginBottom: 8 }} />
+              <div style={{ color: "#637083", fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Compact — inline reference:</div>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "#1E3254", borderRadius: 6, border: "1px solid #2A4D9B", padding: "3px 6px", marginBottom: 8 }}>
+                <span style={{ color: "#FF6B3D", fontWeight: 700, fontSize: 12, marginRight: 2 }}>Nair</span>
+                <span style={{ background: "#0F1A2E", borderRadius: 3, padding: "2px 6px", display: "inline-flex", gap: 3, alignItems: "baseline" }}>
+                  <span style={{ color: "#637083", fontSize: 9, fontWeight: 600 }}>Startup</span>
+                  <span style={{ color: "#ECF2FF", fontWeight: 700, fontSize: 11 }}>7</span>
+                </span>
+                <span style={{ background: "#0F1A2E", borderRadius: 3, padding: "2px 6px", display: "inline-flex", gap: 3, alignItems: "baseline" }}>
+                  <span style={{ color: "#637083", fontSize: 9, fontWeight: 600 }}>Dmg</span>
+                  <span style={{ color: "#ECF2FF", fontWeight: 700, fontSize: 11 }}>8.0%</span>
+                </span>
+                <span style={{ background: "#0F1A2E", borderRadius: 3, padding: "2px 6px", display: "inline-flex", gap: 3, alignItems: "baseline" }}>
+                  <span style={{ color: "#637083", fontSize: 9, fontWeight: 600 }}>Shield</span>
+                  <span style={{ color: "#F87171", fontWeight: 700, fontSize: 11 }}>-7</span>
+                </span>
+              </div>
+              <div style={{ color: "#637083", fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Detailed — full stat card:</div>
+              <div style={{ background: "#141C2B", borderRadius: 8, border: "1px solid #2A3449", padding: "6px 8px" }}>
+                <div style={{ color: "#FF6B3D", fontWeight: 800, fontSize: 12, borderBottom: "1px solid #2A3449", paddingBottom: 4, marginBottom: 4 }}>Bayonetta — Nair</div>
+                <div style={{ display: "flex", gap: 12, fontSize: 10 }}>
+                  <div><span style={{ color: "#96A3BD" }}>Startup </span><span style={{ color: "#ECF2FF", fontWeight: 700 }}>Frame 7</span></div>
+                  <div><span style={{ color: "#96A3BD" }}>Damage </span><span style={{ color: "#ECF2FF", fontWeight: 700 }}>8.0%</span></div>
+                </div>
+                <div style={{ display: "flex", gap: 12, fontSize: 10, marginTop: 2 }}>
+                  <div><span style={{ color: "#96A3BD" }}>On Shield </span><span style={{ color: "#F87171", fontWeight: 700 }}>-7</span></div>
+                  <div><span style={{ color: "#96A3BD" }}>Total </span><span style={{ color: "#ECF2FF", fontWeight: 700 }}>34 frames</span></div>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+        </View>
       </View>
+
+      {/* Frame Data popup */}
+      {fdOpen && (
+        <View style={[styles.fdPopup, isDark && styles.fdPopupDark]}>
+          <View style={styles.fdRow}>
+            <select
+              value={fdCharacter}
+              onChange={(e) => setFdCharacter(e.target.value)}
+              style={{
+                flex: 1,
+                backgroundColor: isDark ? "#141C2B" : "#F4F7FB",
+                color: isDark ? "#ECF2FF" : "#1A2B48",
+                border: `1px solid ${isDark ? "#344158" : "#D8DDE5"}`,
+                borderRadius: 6,
+                padding: "6px 8px",
+                fontSize: 12,
+                outline: "none",
+              }}
+            >
+              <option value="">Select character...</option>
+              {getFrameDataCharacters().map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              value={fdSearch}
+              onChange={(e) => setFdSearch(e.target.value)}
+              placeholder="Search move (jab, nair, fsmash...)"
+              style={{
+                flex: 2,
+                backgroundColor: isDark ? "#141C2B" : "#F4F7FB",
+                color: isDark ? "#ECF2FF" : "#1A2B48",
+                border: `1px solid ${isDark ? "#344158" : "#D8DDE5"}`,
+                borderRadius: 6,
+                padding: "6px 8px",
+                fontSize: 12,
+                outline: "none",
+              }}
+            />
+            <View style={styles.fdFormatPicker}>
+              <Pressable
+                style={[styles.fdFormatBtn, fdFormat === "compact" && styles.fdFormatBtnActive]}
+                onPress={() => setFdFormat("compact")}
+              >
+                <Text style={[styles.fdFormatBtnLabel, fdFormat === "compact" && styles.fdFormatBtnLabelActive]}>Compact</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.fdFormatBtn, fdFormat === "detailed" && styles.fdFormatBtnActive]}
+                onPress={() => setFdFormat("detailed")}
+              >
+                <Text style={[styles.fdFormatBtnLabel, fdFormat === "detailed" && styles.fdFormatBtnLabelActive]}>Detailed</Text>
+              </Pressable>
+            </View>
+            <Pressable style={styles.fdCloseBtn} onPress={() => setFdOpen(false)}>
+              <Text style={styles.fdCloseBtnLabel}>Close</Text>
+            </Pressable>
+          </View>
+          {fdResults.length > 0 && (
+            <View style={styles.fdResults}>
+              {fdResults.map((move, i) => (
+                <Pressable
+                  key={`${move.moveName}-${i}`}
+                  style={[styles.fdResult, isDark && styles.fdResultDark]}
+                  onPress={() => {
+                    const html = fdFormat === "detailed"
+                      ? formatMoveDetailedHtml(move, fdCharacter)
+                      : formatMoveAsHtml(move, fdCharacter);
+                    const el = editorRef.current;
+                    if (el) {
+                      el.focus();
+                      // Restore saved cursor position
+                      if (savedSelectionRef.current) {
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(savedSelectionRef.current);
+                        savedSelectionRef.current = null;
+                      }
+                      document.execCommand("insertHTML", false, html);
+                      if (onChange) onChange(el.innerHTML);
+                    }
+                    setFdOpen(false);
+                    setFdSearch("");
+                  }}
+                >
+                  <Text style={styles.fdMoveName}>{move.moveName}</Text>
+                  <Text style={styles.fdMoveStats}>
+                    {[
+                      move.startup && move.startup !== "--" ? `${move.startup}f` : null,
+                      move.baseDamage && move.baseDamage !== "--" ? `${move.baseDamage}%` : null,
+                      move.advantage && move.advantage !== "--" ? `${move.advantage}` : null,
+                    ].filter(Boolean).join(" | ")}
+                  </Text>
+                  <Text style={styles.fdMoveCat}>{move.categoryLabel}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {fdSearch.trim() && fdCharacter && fdResults.length === 0 && (
+            <Text style={styles.fdNoResults}>No matching moves</Text>
+          )}
+          {!fdCharacter && (
+            <Text style={styles.fdNoResults}>Select a character to search moves</Text>
+          )}
+        </View>
+      )}
 
       {/* Editor area */}
       <View style={[styles.editorWrap, { minHeight }, editorStyle]}>
@@ -528,6 +857,10 @@ export default function LiveTextEditor({
           onInput={handleInput}
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
           style={{
             minHeight,
             outline: "none",
@@ -601,5 +934,167 @@ const styles = StyleSheet.create({
   },
   editorWrap: {
     flex: 1,
+  },
+  fdPopup: {
+    backgroundColor: "#F8FAFD",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E4E8EF",
+    padding: 8,
+  },
+  fdPopupDark: {
+    backgroundColor: "#141C2B",
+    borderBottomColor: "#2A3449",
+  },
+  fdRow: {
+    flexDirection: "row",
+    gap: 6,
+    alignItems: "center",
+  },
+  fdCloseBtn: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: "#2A3449",
+  },
+  fdCloseBtnLabel: {
+    color: "#96A3BD",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  fdResults: {
+    marginTop: 6,
+    maxHeight: 200,
+    overflow: "scroll",
+  },
+  fdResult: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginBottom: 2,
+    gap: 8,
+  },
+  fdResultDark: {
+    backgroundColor: "#1B2333",
+  },
+  fdMoveName: {
+    color: "#FF6B3D",
+    fontWeight: "700",
+    fontSize: 13,
+    minWidth: 100,
+  },
+  fdMoveStats: {
+    color: "#ECF2FF",
+    fontSize: 12,
+    flex: 1,
+  },
+  fdMoveCat: {
+    color: "#637083",
+    fontSize: 10,
+  },
+  fdNoResults: {
+    color: "#637083",
+    fontSize: 12,
+    marginTop: 8,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
+  fdBtnWrap: {
+    position: "static",
+  },
+  fdTooltip: {
+    position: "fixed",
+    width: 280,
+    backgroundColor: "#F8FAFD",
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#D8DDE5",
+    zIndex: 99999,
+    boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+    pointerEvents: "none",
+  },
+  fdTooltipDark: {
+    backgroundColor: "#1B2333",
+    borderColor: "#2A3449",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+  },
+  fdTooltipTitle: {
+    color: "#FF6B3D",
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  fdTooltipDesc: {
+    color: "#96A3BD",
+    fontSize: 11,
+    lineHeight: 16,
+    marginBottom: 8,
+  },
+  fdTooltipDivider: {
+    height: 1,
+    backgroundColor: "#2A3449",
+    marginBottom: 8,
+  },
+  fdTooltipPreviewLabel: {
+    color: "#637083",
+    fontSize: 10,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  fdTooltipPreview: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E3254",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#2A4D9B",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  fdTooltipMoveName: {
+    color: "#FF6B3D",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  fdTooltipStats: {
+    color: "#96A3BD",
+    fontSize: 11,
+  },
+  fdTooltipDetailedPreview: {
+    backgroundColor: "#141C2B",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    padding: 6,
+  },
+  fdTooltipDetailRow: {
+    color: "#96A3BD",
+    fontSize: 10,
+    marginTop: 2,
+  },
+  fdFormatPicker: {
+    flexDirection: "row",
+    gap: 2,
+    backgroundColor: "#0F1420",
+    borderRadius: 6,
+    padding: 2,
+  },
+  fdFormatBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  fdFormatBtnActive: {
+    backgroundColor: "#FF6B3D",
+  },
+  fdFormatBtnLabel: {
+    color: "#637083",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  fdFormatBtnLabelActive: {
+    color: "#fff",
   },
 });

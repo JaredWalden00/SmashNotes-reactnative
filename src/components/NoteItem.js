@@ -91,7 +91,7 @@ function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString();
 }
 
-export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = false, compact = false }) {
+export default function NoteItem({ note, onEdit, onDelete, onSave, onView, onViewVod, forceDark = false, compact = false }) {
   const isDark = forceDark || useColorScheme() === "dark";
   const summaryLines = getNoteSummaryLines(note.sections);
   const [viewMode, setViewMode] = useState(null); // null = card, "view" = read-only, "edit" = inline edit
@@ -221,6 +221,19 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
             {note.setEvent ? <Text style={styles.viewSetEvent}>{note.setEvent}</Text> : null}
             {note.setScore ? <Text style={styles.viewSetScore}>{note.setScore}</Text> : null}
           </View>
+        ) : null}
+
+        {/* VOD link */}
+        {note.vodUrl ? (
+          <Pressable
+            style={[styles.viewSetBadge, isDark && styles.viewSetBadgeDark]}
+            onPress={() => {
+              if (typeof window !== "undefined") window.open(note.vodUrl, "_blank");
+            }}
+          >
+            <Text style={styles.viewSetTournament}>🎬 VOD Review</Text>
+            <Text style={styles.viewSetEvent}>{note.vodUrl}</Text>
+          </Pressable>
         ) : null}
 
         {/* Sections */}
@@ -391,7 +404,7 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
 
   return (
     <View style={[styles.card, isDark && styles.cardDark]}>
-      <Pressable style={styles.contentWrap} onPress={() => setViewMode("view")}>
+      <Pressable style={styles.contentWrap} onPress={() => onView ? onView(note) : setViewMode("view")}>
         <View style={styles.headerRow}>
           <View style={styles.matchupWrap}>
             <Image source={getFighterIcon(note.character)} style={styles.icon} />
@@ -441,15 +454,23 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, forceDark = f
       </Pressable>
 
       <View style={styles.actions}>
+        {note.vodUrl && onViewVod ? (
+          <Pressable
+            style={[styles.actionBtn, styles.vodBtn, isDark && styles.vodBtnDark]}
+            onPress={() => onViewVod(note)}
+          >
+            <Text style={styles.vodBtnLabel}>🎬 View VOD</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           style={[styles.actionBtn, styles.viewBtn, isDark && styles.viewBtnDark]}
-          onPress={() => setViewMode("view")}
+          onPress={() => onView ? onView(note) : setViewMode("view")}
         >
           <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>View</Text>
         </Pressable>
         <Pressable
           style={[styles.actionBtn, styles.editBtn, isDark && styles.editBtnDark]}
-          onPress={() => (onSave ? startEditing() : onEdit(note))}
+          onPress={() => onView ? onView(note) : (onSave ? startEditing() : onEdit(note))}
         >
           <Text style={[styles.actionLabel, isDark && styles.actionLabelDark]}>Edit</Text>
         </Pressable>
@@ -587,6 +608,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 10,
+  },
+  vodBtn: {
+    backgroundColor: "#FF6B3D",
+  },
+  vodBtnDark: {
+    backgroundColor: "#FF6B3D",
+  },
+  vodBtnLabel: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
   },
   viewBtn: {
     backgroundColor: "#E0EDFF",

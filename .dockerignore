@@ -5,3 +5,5 @@ npm-debug.log
 Dockerfile*
 docker-compose*.yml
 supabase/.temp
+.claude
+rich-text-editor

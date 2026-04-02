@@ -13,7 +13,7 @@ function dedupeByTag(opponents) {
   });
 }
 
-export default function RecentOpponentsCard({ playerId, accessToken, notes, onSelectOpponent, refreshKey }) {
+export default function RecentOpponentsCard({ playerId, accessToken, notes, onSelectOpponent, onShowAll, refreshKey, maxShown = 4 }) {
   const [opponents, setOpponents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -68,8 +68,9 @@ export default function RecentOpponentsCard({ playerId, accessToken, notes, onSe
           <Text style={styles.emptyBody}>Play some tournament sets to see your opponents here.</Text>
         </View>
       ) : (
+        <>
         <View style={styles.opponentsWrap}>
-          {dedupeByTag(opponents).map((opp) => {
+          {dedupeByTag(opponents).slice(0, maxShown).map((opp) => {
             const noteCount = getNotesCountForOpponent(opp);
             const topChar = opp.characters[0] ? resolveFighterName(opp.characters[0]) : null;
             const iconSource = getFighterIcon(topChar) || getFighterIcon(null);
@@ -106,6 +107,12 @@ export default function RecentOpponentsCard({ playerId, accessToken, notes, onSe
             );
           })}
         </View>
+        {dedupeByTag(opponents).length > maxShown && onShowAll && (
+          <Pressable style={styles.showAllBtn} onPress={onShowAll}>
+            <Text style={styles.showAllBtnLabel}>View All Opponents ({dedupeByTag(opponents).length})</Text>
+          </Pressable>
+        )}
+        </>
       )}
     </>
   );
@@ -223,6 +230,19 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#637083",
     lineHeight: 21,
+    fontSize: 13,
+  },
+  showAllBtn: {
+    marginTop: 10,
+    alignSelf: "center",
+    backgroundColor: "#2A3449",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  showAllBtnLabel: {
+    color: "#FF6B3D",
+    fontWeight: "700",
     fontSize: 13,
   },
 });

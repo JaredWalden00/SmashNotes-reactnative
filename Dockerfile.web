@@ -2,12 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# Install dependencies first (cached layer)
 COPY package*.json ./
 RUN npm ci
 
+# Copy source
 COPY . .
 
-EXPOSE 19006
 EXPOSE 8081
 
-CMD ["npm", "run", "web", "--", "--host", "lan", "--port", "19006"]
+CMD ["npx", "expo", "start", "--web", "--host", "lan", "--port", "8081"]

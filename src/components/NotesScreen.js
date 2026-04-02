@@ -10,6 +10,10 @@ import StartGGScreen from "./StartGGScreen";
 import StatsTab from "./StatsTab";
 import PlayersTab from "./PlayersTab";
 import SettingsTab from "./SettingsTab";
+import VodReviewTab from "./VodReviewTab";
+import FrameDataTab from "./FrameDataTab";
+import TournamentTab from "./TournamentTab";
+import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import { matchesSmashNoteSearch } from "../utils/smashNoteModel";
 import { useStartGGSchedule } from "../hooks/useStartGG";
 
@@ -45,6 +49,7 @@ export default function NotesScreen({
   onSaveInlineEdit,
   onCreateNote,
   onQuickCreateNote,
+  onCreateNoteSilent,
   onSignOut,
   startggUser,
   startggIsAuthenticated,
@@ -67,6 +72,14 @@ export default function NotesScreen({
   const [allNotesCharFilter, setAllNotesCharFilter] = useState(null);
   const [allNotesPlayerFilter, setAllNotesPlayerFilter] = useState("");
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  const [pendingVodNote, setPendingVodNote] = useState(null);
+
+  function handleViewVod(note) {
+    if (note && note.vodUrl) {
+      setPendingVodNote(note);
+      navigateTo("vod-review");
+    }
+  }
 
   function navigateTo(section) {
     setActiveNavSection(section);
@@ -250,7 +263,7 @@ export default function NotesScreen({
               {filteredAllNotes.length > 0 ? (
                 <View style={styles.recentNotesWrap}>
                   {filteredAllNotes.map((note) => (
-                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
+                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} forceDark compact />
                   ))}
                 </View>
               ) : (
@@ -271,9 +284,11 @@ export default function NotesScreen({
     const navItems = [
       { key: "my-stuff", label: "My Stuff" },
       { key: "all-notes", label: "All Notes" },
+      { key: "tournaments", label: "Tournaments" },
       { key: "stats", label: "Stats" },
       { key: "players", label: "Players" },
-      { key: "discovery", label: "Start.gg" },
+      { key: "vod-review", label: "VOD Review" },
+      { key: "frame-data", label: "Frame Data" },
     ];
     return (
       <View style={styles.sideRail}>
@@ -305,9 +320,11 @@ export default function NotesScreen({
   function renderMobileNav(activeSection) {
     const navItems = [
       { key: "all-notes", label: "All Notes" },
+      { key: "tournaments", label: "Tournaments" },
       { key: "stats", label: "Stats" },
       { key: "players", label: "Players" },
-      { key: "discovery", label: "Start.gg" },
+      { key: "vod-review", label: "VOD Review" },
+      { key: "frame-data", label: "Frame Data" },
       { key: "settings", label: "Settings" },
     ];
     return navItems
@@ -320,6 +337,35 @@ export default function NotesScreen({
   }
 
   // Stats tab
+  // Tournaments tab
+  if (activeNavSection === "tournaments" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("tournaments") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>Tournaments</Text>
+          </View>
+          <TournamentTab
+            allNotes={allNotes}
+            accessToken={accessToken}
+            playerGamerTag={startggUser?.player?.gamerTag}
+            onCreateNoteSilent={onCreateNoteSilent}
+            onEditNote={onEditNote}
+            onDeleteNote={onDeleteNote}
+            onSaveInlineEdit={onSaveInlineEdit}
+            onViewVod={handleViewVod}
+          />
+        </View>
+      </View>
+    );
+  }
+
   if (activeNavSection === "stats" && !selectedCharacter) {
     return (
       <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
@@ -368,6 +414,52 @@ export default function NotesScreen({
           </View>
           <PlayersTab
             allNotes={allNotes}
+            accessToken={accessToken}
+            playerId={playerId}
+            onEditNote={onEditNote}
+            onDeleteNote={onDeleteNote}
+            onSaveInlineEdit={onSaveInlineEdit}
+            onViewVod={handleViewVod}
+            onTrackPlayer={(playerData) => {
+              onCreateNoteSilent({
+                title: `${playerData.gamerTag} — Player Notes`,
+                playerTag: playerData.gamerTag,
+                startggPlayerId: playerData.playerId,
+                content: "",
+              });
+            }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  // Settings tab
+  // VOD Review tab
+  if (activeNavSection === "vod-review" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("vod-review") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>VOD Review</Text>
+          </View>
+          <VodReviewTab
+            allNotes={allNotes}
+            pendingVodNote={pendingVodNote}
+            onClearPendingVodNote={() => setPendingVodNote(null)}
+            onCreateVodNote={(vodData) => {
+              onCreateNoteSilent({
+                vodUrl: vodData.vodUrl,
+                title: vodData.title,
+                content: vodData.content,
+              });
+            }}
             onEditNote={onEditNote}
             onDeleteNote={onDeleteNote}
             onSaveInlineEdit={onSaveInlineEdit}
@@ -377,7 +469,26 @@ export default function NotesScreen({
     );
   }
 
-  // Settings tab
+  // Frame Data tab
+  if (activeNavSection === "frame-data" && !selectedCharacter) {
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
+        {isWideLayout ? renderSideRail("frame-data") : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>Frame Data</Text>
+          </View>
+          <FrameDataTab />
+        </View>
+      </View>
+    );
+  }
+
   if (activeNavSection === "settings" && !selectedCharacter) {
     const MAIN_NONE = "__none__";
     const settingsMainOptions = [
@@ -416,25 +527,6 @@ export default function NotesScreen({
   }
 
   // If we're showing Start.gg features, render that instead of the normal dashboard
-  if (activeNavSection === "discovery" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("discovery") : null}
-        <View style={styles.dashboardMain}>
-          {!isWideLayout && (
-            <View style={styles.dashboardTopBar}>
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-              <Text style={styles.dashboardTitle}>Start.gg</Text>
-            </View>
-          )}
-          <StartGGScreen onCreateNote={handleCreateNoteFromStartGG} />
-        </View>
-      </View>
-    );
-  }
-
   // Full "Most Played Against" page
   if (!selectedCharacter && showAllMatchups) {
     return (
@@ -510,7 +602,7 @@ export default function NotesScreen({
                 </View>
                 <View style={styles.recentNotesWrap}>
                   {opponentNotes.map((note) => (
-                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
+                    <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} forceDark compact />
                   ))}
                 </View>
               </View>
@@ -582,12 +674,53 @@ export default function NotesScreen({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+            {/* Upcoming Tournament */}
+            <UpcomingTournamentCard
+              accessToken={accessToken}
+              playerGamerTag={startggUser?.player?.gamerTag}
+              allNotes={allNotes}
+              onNavigateToTournament={() => navigateTo("tournaments")}
+              onNavigateToPlayer={(tag) => {
+                setFilteredPlayerTag(tag);
+                setFilteredPlayerId(null);
+              }}
+            />
+
+            {/* Quick Stats Row */}
+            {allNotes && allNotes.length > 0 && (
+              <View style={styles.quickStatsRow}>
+                <Pressable style={styles.quickStatBox} onPress={() => navigateTo("all-notes")}>
+                  <Text style={styles.quickStatNumber}>{allNotes.length}</Text>
+                  <Text style={styles.quickStatLabel}>Notes</Text>
+                </Pressable>
+                <Pressable style={styles.quickStatBox} onPress={() => navigateTo("players")}>
+                  <Text style={styles.quickStatNumber}>
+                    {new Set(allNotes.map((n) => n.playerTag).filter(Boolean)).size}
+                  </Text>
+                  <Text style={styles.quickStatLabel}>Players</Text>
+                </Pressable>
+                <Pressable style={styles.quickStatBox} onPress={() => navigateTo("stats")}>
+                  <Text style={styles.quickStatNumber}>
+                    {new Set(allNotes.map((n) => n.character).filter((c) => c && c !== "General")).size}
+                  </Text>
+                  <Text style={styles.quickStatLabel}>Characters</Text>
+                </Pressable>
+                <Pressable style={styles.quickStatBox} onPress={() => navigateTo("vod-review")}>
+                  <Text style={styles.quickStatNumber}>
+                    {allNotes.filter((n) => n.vodUrl).length}
+                  </Text>
+                  <Text style={styles.quickStatLabel}>VODs</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {/* Recent Notes */}
             <View style={styles.dashboardCard}>
               <View style={styles.dashboardCardHeader}>
                 <Text style={styles.dashboardCardTitle}>Recent Notes</Text>
-                <Text style={styles.dashboardCardMeta}>
-                  {visibleRecentNotes.length} shown
-                </Text>
+                <Pressable onPress={() => navigateTo("all-notes")}>
+                  <Text style={styles.dashboardCardLink}>View All</Text>
+                </Pressable>
               </View>
 
               {isNotesLoading ? (
@@ -599,7 +732,7 @@ export default function NotesScreen({
 
               <View style={styles.recentNotesWrap}>
                 {visibleRecentNotes.map((note) => (
-                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} forceDark compact />
+                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} forceDark compact />
                 ))}
               </View>
 
@@ -611,6 +744,24 @@ export default function NotesScreen({
               ) : null}
             </View>
 
+            {/* Recent Opponents — 4 shown, View All goes to Players tab */}
+            <View style={styles.dashboardCard}>
+              <RecentOpponentsCard
+                playerId={playerId}
+                accessToken={accessToken}
+                refreshKey={dashboardRefreshKey}
+                notes={allNotes}
+                maxShown={4}
+                onSelectOpponent={(opponent) => {
+                  navigateTo("my-stuff");
+                  setFilteredPlayerTag(opponent.gamerTag);
+                  setFilteredPlayerId(opponent.playerId);
+                }}
+                onShowAll={() => navigateTo("players")}
+              />
+            </View>
+
+            {/* Most Played Against — 3 shown, View All expands */}
             <View style={styles.dashboardCard}>
               <RecentCharactersCard
                 playerId={playerId}
@@ -621,20 +772,6 @@ export default function NotesScreen({
                   navigateTo && navigateTo("my-stuff");
                 }}
                 onShowAll={() => setShowAllMatchups(true)}
-              />
-            </View>
-
-            <View style={styles.dashboardCard}>
-              <RecentOpponentsCard
-                playerId={playerId}
-                accessToken={accessToken}
-                refreshKey={dashboardRefreshKey}
-                notes={allNotes}
-                onSelectOpponent={(opponent) => {
-                  navigateTo("my-stuff");
-                  setFilteredPlayerTag(opponent.gamerTag);
-                  setFilteredPlayerId(opponent.playerId);
-                }}
               />
             </View>
           </ScrollView>
@@ -786,7 +923,7 @@ export default function NotesScreen({
 
             {displayedNotes.length ? (
               displayedNotes.map((note) => (
-                <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} />
+                <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} />
               ))
             ) : (
               <View style={[styles.emptyStateCard, isDark && styles.emptyStateCardDark]}>
@@ -1312,6 +1449,36 @@ const styles = StyleSheet.create({
     color: "#96A3BD",
     fontSize: 12,
     fontWeight: "700",
+  },
+  dashboardCardLink: {
+    color: "#FF6B3D",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  quickStatsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 16,
+  },
+  quickStatBox: {
+    flex: 1,
+    backgroundColor: "#1B2333",
+    borderRadius: 12,
+    padding: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#2A3449",
+  },
+  quickStatNumber: {
+    color: "#FF6B3D",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  quickStatLabel: {
+    color: "#96A3BD",
+    fontSize: 10,
+    fontWeight: "700",
+    marginTop: 4,
   },
   dashboardPickerWrap: {
     borderRadius: 12,

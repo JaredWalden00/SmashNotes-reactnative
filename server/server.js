@@ -3,16 +3,27 @@ const express = require('express');
 const bodyParser = require('body-parser');
 require('dotenv').config();
 
-// Node 22+ has global fetch built-in — no import needed
-
 const app = express();
 const cors = require('cors');
+
+// Allow requests from both local dev and Docker containers
 app.use(cors({
-  origin: 'http://localhost:8081', // or '*' for all origins (less secure)
-  credentials: false // set to true if you use cookies/auth headers
+  origin: [
+    'http://localhost:8081',
+    'http://localhost:19006',
+    'http://127.0.0.1:8081',
+    'http://smashnotes-expo-web:8081',
+  ],
+  credentials: false,
 }));
 app.use(bodyParser.json());
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Start.gg OAuth token exchange
 app.post('/api/startgg/exchange', async (req, res) => {
   const { code, redirect_uri, code_verifier } = req.body;
   try {
@@ -41,4 +52,4 @@ app.post('/api/startgg/exchange', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));

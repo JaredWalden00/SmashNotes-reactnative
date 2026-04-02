@@ -181,6 +181,7 @@ export function matchesSmashNoteSearch(note, search) {
     note.playerTag,
     note.setTournament,
     note.setEvent,
+    note.vodUrl,
     ...Object.values(createEmptySections(note.sections)),
   ]
     .filter(Boolean)
@@ -214,6 +215,7 @@ export function normalizeNote(note) {
       setTournament: note.setTournament || null,
       setEvent: note.setEvent || null,
       setScore: note.setScore || null,
+      vodUrl: note.vodUrl || null,
     };
   }
 
@@ -242,6 +244,7 @@ export function normalizeNote(note) {
         setTournament: payload.setTournament || null,
         setEvent: payload.setEvent || null,
         setScore: payload.setScore || null,
+        vodUrl: payload.vodUrl || null,
       };
     } catch {
       // Fall back to legacy note parsing if the structured payload is invalid.
@@ -265,6 +268,7 @@ export function normalizeNote(note) {
     setTournament: null,
     setEvent: null,
     setScore: null,
+    vodUrl: null,
   };
 }
 
@@ -288,6 +292,7 @@ export function serializeNoteForStorage(note) {
         setTournament: normalized.setTournament || null,
         setEvent: normalized.setEvent || null,
         setScore: normalized.setScore || null,
+        vodUrl: normalized.vodUrl || null,
       }),
   };
 }
