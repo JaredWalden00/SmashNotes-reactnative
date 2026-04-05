@@ -220,6 +220,7 @@ export default function VodReviewTab({ allNotes, pendingVodNote, onClearPendingV
         // Not a YouTube message, ignore
       }
     }
+    if (typeof window === "undefined" || !window.addEventListener) return;
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [activeUrl]);

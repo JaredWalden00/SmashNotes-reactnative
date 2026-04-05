@@ -19,7 +19,7 @@ export default function FighterTile({
         selected && styles.tileSelected,
         selected && isDark && styles.tileSelectedDark,
       ]}
-      onPress={() => onPress(fighter.name)}
+      onPress={() => { if (onPress) onPress(fighter.name); }}
     >
       {isMain ? (
         <View style={styles.mainBadge}>
@@ -41,10 +41,10 @@ export default function FighterTile({
 
 const styles = StyleSheet.create({
   tile: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1B2333",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#DEE4EF",
+    borderColor: "#2A3449",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   tileSelected: {
     borderColor: "#FF6B3D",
-    backgroundColor: "#FFF3EE",
+    backgroundColor: "#3A2B22",
   },
   tileSelectedDark: {
     backgroundColor: "#3A2B22",
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#20304E",
+    color: "#C9D4E8",
     textAlign: "center",
     minHeight: 28,
   },

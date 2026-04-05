@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function ForgotPasswordPage({
   authEmail,
@@ -8,7 +8,8 @@ export default function ForgotPasswordPage({
   onCancelForgotPassword,
 }) {
   return (
-    <View style={styles.authScreen}>
+    <KeyboardAvoidingView style={styles.authScreen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.authScrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.card}>
         <Text style={styles.title}>Forgot your password?</Text>
         <Text style={styles.subtitle}>
@@ -33,16 +34,21 @@ export default function ForgotPasswordPage({
           <Text style={styles.linkText}>Back to Login</Text>
         </Pressable>
       </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   authScreen: {
     flex: 1,
+    backgroundColor: "#050A17",
+  },
+  authScrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 18,
-    backgroundColor: "#050A17",
+    paddingVertical: 20,
   },
   card: {
     backgroundColor: "#0B1020",

@@ -132,7 +132,7 @@ export default function UpcomingTournamentCard({ accessToken, playerGamerTag, al
   const isUpcoming = !isLive;
 
   return (
-    <Pressable style={styles.card} onPress={onNavigateToTournament}>
+    <Pressable style={styles.card} onPress={() => onNavigateToTournament && onNavigateToTournament(tournament)}>
       <View style={styles.headerRow}>
         <View style={styles.headerInfo}>
           {isLive ? (

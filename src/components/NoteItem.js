@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, Text, TextInput, View, useColorScheme } from "react-native";
 import { getFighterIcon } from "../data/smashFighters";
 import {
   getNoteSummaryLines,
@@ -12,7 +12,16 @@ import {
 } from "../utils/smashNoteModel";
 import LiveTextEditor from "./LiveTextEditor";
 
-function RichTextViewer({ html, isDark }) {
+function RichTextViewerNative({ html, isDark }) {
+  const plainText = (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return (
+    <Text style={{ color: isDark ? "#D6E0F5" : "#1A2B48", fontSize: 15, lineHeight: 24 }}>
+      {plainText}
+    </Text>
+  );
+}
+
+function RichTextViewerWeb({ html, isDark }) {
   const containerRef = useRef(null);
   const styleRef = useRef(null);
 
@@ -30,15 +39,7 @@ function RichTextViewer({ html, isDark }) {
     const quoteColor = isDark ? "#8A93A7" : "#5A6B84";
     const linkColor = isDark ? "#6B9CFF" : "#2A4D9B";
     styleRef.current.textContent = `
-      .rich-viewer {
-        color: ${fg};
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        font-size: 15px;
-        line-height: 1.7;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        white-space: pre-wrap;
-      }
+      .rich-viewer { color: ${fg}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.7; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap; }
       .rich-viewer h1 { font-size: 22px; font-weight: 800; margin: 10px 0 6px; }
       .rich-viewer h2 { font-size: 18px; font-weight: 700; margin: 8px 0 4px; }
       .rich-viewer h3 { font-size: 16px; font-weight: 700; margin: 6px 0 4px; }
@@ -46,30 +47,9 @@ function RichTextViewer({ html, isDark }) {
       .rich-viewer a { color: ${linkColor}; }
       .rich-viewer ul, .rich-viewer ol { padding-left: 24px; margin: 6px 0; }
       .rich-viewer li { margin: 2px 0; }
-      .rich-viewer blockquote {
-        border-left: 3px solid ${quoteBorder};
-        padding: 6px 12px;
-        margin: 8px 0;
-        color: ${quoteColor};
-        font-style: italic;
-      }
-      .rich-viewer pre {
-        background: ${codeBg};
-        border: 1px solid ${borderColor};
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        overflow-x: auto;
-        margin: 8px 0;
-      }
-      .rich-viewer code {
-        background: ${codeBg};
-        padding: 2px 5px;
-        border-radius: 4px;
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-      }
+      .rich-viewer blockquote { border-left: 3px solid ${quoteBorder}; padding: 6px 12px; margin: 8px 0; color: ${quoteColor}; font-style: italic; }
+      .rich-viewer pre { background: ${codeBg}; border: 1px solid ${borderColor}; border-radius: 8px; padding: 10px 12px; font-family: 'Courier New', monospace; font-size: 14px; overflow-x: auto; margin: 8px 0; }
+      .rich-viewer code { background: ${codeBg}; padding: 2px 5px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 14px; }
       .rich-viewer strong { font-weight: 700; }
       .rich-viewer em { font-style: italic; }
       .rich-viewer u { text-decoration: underline; }
@@ -86,6 +66,8 @@ function RichTextViewer({ html, isDark }) {
     <div ref={containerRef} className="rich-viewer" style={{ userSelect: "text" }} />
   );
 }
+
+const RichTextViewer = Platform.OS === "web" ? RichTextViewerWeb : RichTextViewerNative;
 
 function formatDate(timestamp) {
   return new Date(timestamp).toLocaleString();
@@ -484,12 +466,12 @@ export default function NoteItem({ note, onEdit, onDelete, onSave, onView, onVie
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
+    backgroundColor: "#1B2333",
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
     boxShadow: "0px 2px 5px rgba(0,0,0,0.06)",
     elevation: 1,
   },
@@ -530,7 +512,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A2B48",
+    color: "#ECF2FF",
     marginBottom: 4,
   },
   titleDark: {
@@ -550,15 +532,15 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   generalChip: {
-    backgroundColor: "#E8F4FF",
+    backgroundColor: "#1E3254",
   },
   matchupChip: {
-    backgroundColor: "#FFF1EA",
+    backgroundColor: "#3B2A30",
   },
   typeChipLabel: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
   },
   typeChipDark: {
     borderWidth: 1,
@@ -576,7 +558,7 @@ const styles = StyleSheet.create({
   },
   body: {
     fontSize: 14,
-    color: "#4D5B72",
+    color: "#A8B5CB",
     lineHeight: 20,
     marginBottom: 6,
   },
@@ -585,7 +567,7 @@ const styles = StyleSheet.create({
   },
   bodyLabel: {
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
   },
   bodyLabelDark: {
     color: "#ECF2FF",
@@ -621,26 +603,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   viewBtn: {
-    backgroundColor: "#E0EDFF",
+    backgroundColor: "#1E3254",
   },
   viewBtnDark: {
     backgroundColor: "#1E3254",
   },
   editBtn: {
-    backgroundColor: "#D5E8FF",
+    backgroundColor: "#2A3E5B",
   },
   editBtnDark: {
     backgroundColor: "#2A3E5B",
   },
   deleteBtn: {
-    backgroundColor: "#FFDCE0",
+    backgroundColor: "#4A2930",
   },
   deleteBtnDark: {
     backgroundColor: "#4A2930",
   },
   actionLabel: {
     fontWeight: "600",
-    color: "#1E2A3A",
+    color: "#ECF2FF",
   },
   actionLabelDark: {
     color: "#ECF2FF",
@@ -658,8 +640,8 @@ const styles = StyleSheet.create({
   sectionChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
-    backgroundColor: "#F8FAFD",
+    borderColor: "#344158",
+    backgroundColor: "#141C2B",
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -668,7 +650,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#182131",
   },
   sectionChipLabel: {
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -687,11 +669,11 @@ const styles = StyleSheet.create({
   customSectionInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    color: "#1A2B48",
+    color: "#ECF2FF",
     fontSize: 13,
   },
   customSectionInputDark: {
@@ -727,10 +709,10 @@ const styles = StyleSheet.create({
   orderBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CFD7E6",
+    borderColor: "#4A5D7F",
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
   },
   orderBtnDark: {
     borderColor: "#4A5D7F",
@@ -740,7 +722,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   orderBtnLabel: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
     fontWeight: "800",
     fontSize: 11,
   },
@@ -751,7 +733,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: "#FFEDED",
+    backgroundColor: "#3A242B",
   },
   removeSectionBtnDark: {
     backgroundColor: "#3A242B",
@@ -776,7 +758,7 @@ const styles = StyleSheet.create({
   editFieldLabel: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
     marginBottom: 6,
   },
   editFieldLabelDark: {
@@ -784,14 +766,14 @@ const styles = StyleSheet.create({
   },
   editTitleInput: {
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A2B48",
-    backgroundColor: "#FFFFFF",
+    color: "#ECF2FF",
+    backgroundColor: "#1B2333",
   },
   editTitleInputDark: {
     borderColor: "#344158",
@@ -808,7 +790,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cancelEditBtn: {
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
   },
   cancelEditBtnDark: {
     backgroundColor: "#273348",
@@ -853,7 +835,7 @@ const styles = StyleSheet.create({
   viewTitle: {
     fontSize: 22,
     fontWeight: "800",
-    color: "#1A2B48",
+    color: "#ECF2FF",
     marginBottom: 8,
   },
   viewMetaRow: {
@@ -890,11 +872,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   viewSection: {
-    backgroundColor: "#F4F7FB",
+    backgroundColor: "#141C2B",
     borderRadius: 10,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
   },
   viewSectionDark: {
     backgroundColor: "#141C2B",
@@ -903,7 +885,7 @@ const styles = StyleSheet.create({
   viewSectionLabel: {
     fontSize: 12,
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
     marginBottom: 8,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -914,18 +896,18 @@ const styles = StyleSheet.create({
   viewSectionBody: {
     fontSize: 15,
     lineHeight: 24,
-    color: "#1A2B48",
+    color: "#ECF2FF",
   },
   viewSectionBodyDark: {
     color: "#D6E0F5",
   },
   viewSetBadge: {
-    backgroundColor: "#F4F7FB",
+    backgroundColor: "#141C2B",
     borderRadius: 10,
     padding: 12,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
   },
   viewSetBadgeDark: {
     backgroundColor: "#141C2B",

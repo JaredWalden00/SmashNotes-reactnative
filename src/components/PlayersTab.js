@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator, StyleSheet } from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView, Image, ActivityIndicator, Platform, StyleSheet } from "react-native";
 import { getFighterIcon, resolveFighterName } from "../data/smashFighters";
 import { fetchSetsPage, startggGraphQL } from "../lib/startggApi";
 import NoteItem from "./NoteItem";
@@ -94,6 +94,7 @@ function DragScrollRow({ children, onLoadMore, isLoadingMore }) {
   }, []);
 
   useEffect(() => {
+    if (typeof document === "undefined") return;
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
     return () => {
@@ -110,6 +111,25 @@ function DragScrollRow({ children, onLoadMore, isLoadingMore }) {
       onLoadMore();
     }
   }, [onLoadMore]);
+
+  // On native, use ScrollView instead of div
+  if (Platform.OS !== "web") {
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ marginBottom: 12 }}
+        contentContainerStyle={{ gap: 10, paddingRight: 16 }}
+      >
+        {children}
+        {isLoadingMore && (
+          <View style={{ justifyContent: "center", alignItems: "center", width: 60 }}>
+            <ActivityIndicator size="small" color="#FF6B3D" />
+          </View>
+        )}
+      </ScrollView>
+    );
+  }
 
   return (
     <div

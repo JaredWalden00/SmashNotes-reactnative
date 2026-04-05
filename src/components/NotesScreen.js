@@ -1,6 +1,6 @@
 import RecentCharactersCard from "./RecentCharactersCard";
 import RecentOpponentsCard from "./RecentOpponentsCard";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useColorScheme, useWindowDimensions } from "react-native";
 import { GENERAL_FIGHTER_NAME, getFighterIcon, getRosterFighters } from "../data/smashFighters";
 import FighterTile from "./FighterTile";
@@ -16,6 +16,7 @@ import TournamentTab from "./TournamentTab";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import { matchesSmashNoteSearch } from "../utils/smashNoteModel";
 import { useStartGGSchedule } from "../hooks/useStartGG";
+import { Ionicons } from "@expo/vector-icons";
 
 const MAIN_NONE_VALUE = "__none__";
 
@@ -73,6 +74,9 @@ export default function NotesScreen({
   const [allNotesPlayerFilter, setAllNotesPlayerFilter] = useState("");
   const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
   const [pendingVodNote, setPendingVodNote] = useState(null);
+  const [pendingTournament, setPendingTournament] = useState(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const charScrollRef = useRef(null);
 
   function handleViewVod(note) {
     if (note && note.vodUrl) {
@@ -88,12 +92,15 @@ export default function NotesScreen({
     }
   }
   const { getTournamentsForDate, loading: tournamentsLoading } = useStartGGSchedule();
-  const mainOptions = getRosterFighters();
+  const mainOptions = getRosterFighters() || [];
   const mainMenuOptions = [
     { label: "No main", value: MAIN_NONE_VALUE },
     ...mainOptions.map((fighter) => ({ label: fighter.name, value: fighter.name, icon: fighter.icon })),
   ];
-  const visibleRecentNotes = recentNotes;
+  const visibleRecentNotes = recentNotes || [];
+  const safeAllNotes = allNotes || [];
+  const safeDisplayedNotes = displayedNotes || [];
+  const safeVisibleOpponents = visibleOpponents || [];
 
   function handleSignOutFromMenu() {
     setIsAccountMenuOpen(false);
@@ -177,6 +184,101 @@ export default function NotesScreen({
     );
   }
 
+  // Mobile bottom nav — must be defined before any early returns that use it
+  const PRIMARY_TABS = [
+    { key: "my-stuff", label: "Home", icon: "home" },
+    { key: "all-notes", label: "Notes", icon: "document-text" },
+    { key: "tournaments", label: "Tourney", icon: "trophy" },
+  ];
+
+  const MORE_TABS = [
+    { key: "stats", label: "Stats", icon: "stats-chart" },
+    { key: "players", label: "Players", icon: "people" },
+    { key: "vod-review", label: "VOD Review", icon: "videocam" },
+    { key: "frame-data", label: "Frame Data", icon: "flash" },
+    { key: "settings", label: "Settings", icon: "settings" },
+  ];
+
+  const isInMoreTab = (section) => MORE_TABS.some((t) => t.key === section);
+
+  function renderMobileBottomNav(activeSection) {
+    const moreActive = isInMoreTab(activeSection);
+    const moreLabel = moreActive ? MORE_TABS.find((t) => t.key === activeSection)?.label : "More";
+
+    return (
+      <>
+        {/* More menu overlay */}
+        {moreMenuOpen && (
+          <>
+            <Pressable style={styles.moreOverlay} onPress={() => setMoreMenuOpen(false)} />
+            <View style={styles.moreSheet}>
+              <View style={styles.moreSheetHandle} />
+              {MORE_TABS.map((item) => {
+                const active = item.key === activeSection;
+                return (
+                  <Pressable
+                    key={item.key}
+                    style={[styles.moreSheetItem, active && styles.moreSheetItemActive]}
+                    onPress={() => { setMoreMenuOpen(false); navigateTo(item.key); }}
+                  >
+                    <Ionicons
+                      name={active ? item.icon : `${item.icon}-outline`}
+                      size={20}
+                      color={active ? "#FF6B3D" : "#637083"}
+                    />
+                    <Text style={[styles.moreSheetLabel, active && styles.moreSheetLabelActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </>
+        )}
+
+        {/* Bottom bar */}
+        <View style={styles.mobileBottomNav}>
+          {PRIMARY_TABS.map((item) => {
+            const active = item.key === activeSection;
+            return (
+              <Pressable
+                key={item.key}
+                style={styles.mobileNavItem}
+                onPress={() => { setMoreMenuOpen(false); navigateTo(item.key); }}
+              >
+                {active && <View style={styles.mobileNavPill} />}
+                <Ionicons
+                  name={active ? item.icon : `${item.icon}-outline`}
+                  size={22}
+                  color={active ? "#FF6B3D" : "#4A5568"}
+                  style={styles.mobileNavIcon}
+                />
+                <Text style={[styles.mobileNavLabel, active && styles.mobileNavLabelActive]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            style={styles.mobileNavItem}
+            onPress={() => setMoreMenuOpen(!moreMenuOpen)}
+          >
+            {(moreActive || moreMenuOpen) && <View style={styles.mobileNavPill} />}
+            <Ionicons
+              name={(moreActive || moreMenuOpen) ? "grid" : "grid-outline"}
+              size={22}
+              color={(moreActive || moreMenuOpen) ? "#FF6B3D" : "#4A5568"}
+              style={styles.mobileNavIcon}
+            />
+            <Text style={[styles.mobileNavLabel, (moreActive || moreMenuOpen) && styles.mobileNavLabelActive]}>
+              {moreLabel}
+            </Text>
+          </Pressable>
+        </View>
+      </>
+    );
+  }
+
   // All Notes view
   if (activeNavSection === "all-notes" && !selectedCharacter) {
     const ALL_CHARS_VALUE = "__all__";
@@ -252,7 +354,7 @@ export default function NotesScreen({
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
             <View style={styles.dashboardCard}>
               <View style={styles.dashboardCardHeader}>
                 <Text style={styles.dashboardCardTitle}>
@@ -274,6 +376,7 @@ export default function NotesScreen({
               )}
             </View>
           </ScrollView>
+          {!isWideLayout && renderMobileBottomNav("all-notes")}
         </View>
       </View>
     );
@@ -317,213 +420,132 @@ export default function NotesScreen({
   }
 
   // Helper for mobile top bar nav buttons
-  function renderMobileNav(activeSection) {
-    const navItems = [
-      { key: "all-notes", label: "All Notes" },
-      { key: "tournaments", label: "Tournaments" },
-      { key: "stats", label: "Stats" },
-      { key: "players", label: "Players" },
-      { key: "vod-review", label: "VOD Review" },
-      { key: "frame-data", label: "Frame Data" },
-      { key: "settings", label: "Settings" },
-    ];
-    return navItems
-      .filter((item) => item.key !== activeSection)
-      .map((item) => (
-        <Pressable key={item.key} style={styles.startggBtn} onPress={() => navigateTo(item.key)}>
-          <Text style={styles.startggBtnLabel}>{item.label}</Text>
-        </Pressable>
-      ));
+  // Wrapper for tab pages — renders with display:none when not active to keep data cached
+  function renderTabPage(tabKey, title, children) {
+    const isActive = activeNavSection === tabKey && !selectedCharacter;
+    return (
+      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark, !isActive && { display: "none" }]}>
+        {isWideLayout ? renderSideRail(tabKey) : null}
+        <View style={styles.dashboardMain}>
+          <View style={styles.dashboardTopBar}>
+            {!isWideLayout && (
+              <Pressable style={styles.mobileBackBtn} onPress={() => navigateTo("my-stuff")}>
+                <Text style={styles.mobileBackBtnLabel}>←</Text>
+              </Pressable>
+            )}
+            <Text style={styles.dashboardTitle}>{title}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            {children}
+          </View>
+          {!isWideLayout && renderMobileBottomNav(tabKey)}
+        </View>
+      </View>
+    );
   }
+
 
   // Stats tab
-  // Tournaments tab
-  if (activeNavSection === "tournaments" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("tournaments") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>Tournaments</Text>
-          </View>
-          <TournamentTab
-            allNotes={allNotes}
-            accessToken={accessToken}
-            playerGamerTag={startggUser?.player?.gamerTag}
-            onCreateNoteSilent={onCreateNoteSilent}
-            onEditNote={onEditNote}
-            onDeleteNote={onDeleteNote}
-            onSaveInlineEdit={onSaveInlineEdit}
-            onViewVod={handleViewVod}
-          />
-        </View>
-      </View>
-    );
-  }
+  // These tabs are always rendered (kept mounted) but hidden when inactive
+  // This prevents data refetching when switching tabs
+  const MAIN_NONE_SETTINGS = "__none__";
+  const settingsMainOptions = [
+    { label: "No main", value: MAIN_NONE_SETTINGS },
+    ...getRosterFighters().map((f) => ({ label: f.name, value: f.name, icon: f.icon })),
+  ];
 
-  if (activeNavSection === "stats" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("stats") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>Stats</Text>
-          </View>
-          <StatsTab
-            playerId={playerId}
-            accessToken={accessToken}
-            onCreateSetNote={(setData) => {
-              onQuickCreateNote(GENERAL_FIGHTER_NAME, {
-                setId: setData.setId,
-                setTournament: setData.setTournament,
-                setEvent: setData.setEvent,
-                setScore: setData.setScore,
-                playerTag: setData.playerTag,
-                opponent: setData.playerTag,
-              });
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
+  const persistentTabs = (
+    <>
+      {renderTabPage("tournaments", "Tournaments",
+        <TournamentTab
+          allNotes={allNotes}
+          accessToken={accessToken}
+          playerGamerTag={startggUser?.player?.gamerTag}
+          onCreateNoteSilent={onCreateNoteSilent}
+          onEditNote={onEditNote}
+          onDeleteNote={onDeleteNote}
+          onSaveInlineEdit={onSaveInlineEdit}
+          onViewVod={handleViewVod}
+          pendingTournament={pendingTournament}
+          onClearPendingTournament={() => setPendingTournament(null)}
+        />
+      )}
+      {renderTabPage("stats", "Stats",
+        <StatsTab
+          playerId={playerId}
+          accessToken={accessToken}
+          onCreateSetNote={(setData) => {
+            onQuickCreateNote(GENERAL_FIGHTER_NAME, {
+              setId: setData.setId,
+              setTournament: setData.setTournament,
+              setEvent: setData.setEvent,
+              setScore: setData.setScore,
+              playerTag: setData.playerTag,
+              opponent: setData.playerTag,
+            });
+          }}
+        />
+      )}
+      {renderTabPage("players", "Players",
+        <PlayersTab
+          allNotes={allNotes}
+          accessToken={accessToken}
+          playerId={playerId}
+          onEditNote={onEditNote}
+          onDeleteNote={onDeleteNote}
+          onSaveInlineEdit={onSaveInlineEdit}
+          onViewVod={handleViewVod}
+          onTrackPlayer={(playerData) => {
+            onCreateNoteSilent({
+              title: `${playerData.gamerTag} — Player Notes`,
+              playerTag: playerData.gamerTag,
+              startggPlayerId: playerData.playerId,
+              content: "",
+            });
+          }}
+        />
+      )}
+      {renderTabPage("vod-review", "VOD Review",
+        <VodReviewTab
+          allNotes={allNotes}
+          pendingVodNote={pendingVodNote}
+          onClearPendingVodNote={() => setPendingVodNote(null)}
+          onCreateVodNote={(vodData) => {
+            onCreateNoteSilent({
+              vodUrl: vodData.vodUrl,
+              title: vodData.title,
+              content: vodData.content,
+            });
+          }}
+          onEditNote={onEditNote}
+          onDeleteNote={onDeleteNote}
+          onSaveInlineEdit={onSaveInlineEdit}
+        />
+      )}
+      {renderTabPage("frame-data", "Frame Data", <FrameDataTab />)}
+      {renderTabPage("settings", "Settings",
+        <SettingsTab
+          startggUser={startggUser}
+          startggIsAuthenticated={startggIsAuthenticated}
+          startggLogin={startggLogin}
+          startggLogout={startggLogout}
+          userMainCharacter={userMainCharacter}
+          onSetMainCharacter={onSetMainCharacter}
+          mainMenuOptions={settingsMainOptions}
+          isMainSaving={isMainSaving}
+          onSignOut={onSignOut}
+          allNotes={allNotes}
+          userId={userId}
+          session={session}
+        />
+      )}
+    </>
+  );
 
-  // Players tab
-  if (activeNavSection === "players" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("players") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>Players</Text>
-          </View>
-          <PlayersTab
-            allNotes={allNotes}
-            accessToken={accessToken}
-            playerId={playerId}
-            onEditNote={onEditNote}
-            onDeleteNote={onDeleteNote}
-            onSaveInlineEdit={onSaveInlineEdit}
-            onViewVod={handleViewVod}
-            onTrackPlayer={(playerData) => {
-              onCreateNoteSilent({
-                title: `${playerData.gamerTag} — Player Notes`,
-                playerTag: playerData.gamerTag,
-                startggPlayerId: playerData.playerId,
-                content: "",
-              });
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  // Settings tab
-  // VOD Review tab
-  if (activeNavSection === "vod-review" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("vod-review") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>VOD Review</Text>
-          </View>
-          <VodReviewTab
-            allNotes={allNotes}
-            pendingVodNote={pendingVodNote}
-            onClearPendingVodNote={() => setPendingVodNote(null)}
-            onCreateVodNote={(vodData) => {
-              onCreateNoteSilent({
-                vodUrl: vodData.vodUrl,
-                title: vodData.title,
-                content: vodData.content,
-              });
-            }}
-            onEditNote={onEditNote}
-            onDeleteNote={onDeleteNote}
-            onSaveInlineEdit={onSaveInlineEdit}
-          />
-        </View>
-      </View>
-    );
-  }
-
-  // Frame Data tab
-  if (activeNavSection === "frame-data" && !selectedCharacter) {
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("frame-data") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>Frame Data</Text>
-          </View>
-          <FrameDataTab />
-        </View>
-      </View>
-    );
-  }
-
-  if (activeNavSection === "settings" && !selectedCharacter) {
-    const MAIN_NONE = "__none__";
-    const settingsMainOptions = [
-      { label: "No main", value: MAIN_NONE },
-      ...getRosterFighters().map((f) => ({ label: f.name, value: f.name, icon: f.icon })),
-    ];
-    return (
-      <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
-        {isWideLayout ? renderSideRail("settings") : null}
-        <View style={styles.dashboardMain}>
-          <View style={styles.dashboardTopBar}>
-            {!isWideLayout && (
-              <Pressable style={styles.backToNotesBtn} onPress={() => navigateTo("my-stuff")}>
-                <Text style={styles.backToNotesBtnLabel}>← My Stuff</Text>
-              </Pressable>
-            )}
-            <Text style={styles.dashboardTitle}>Settings</Text>
-          </View>
-          <SettingsTab
-            startggUser={startggUser}
-            startggIsAuthenticated={startggIsAuthenticated}
-            startggLogin={startggLogin}
-            startggLogout={startggLogout}
-            userMainCharacter={userMainCharacter}
-            onSetMainCharacter={onSetMainCharacter}
-            mainMenuOptions={settingsMainOptions}
-            isMainSaving={isMainSaving}
-            onSignOut={onSignOut}
-            allNotes={allNotes}
-            userId={userId}
-            session={session}
-          />
-        </View>
-      </View>
-    );
+  // If a persistent tab is active and no character selected, show only persistent tabs
+  const persistentTabKeys = ["tournaments", "stats", "players", "vod-review", "frame-data", "settings"];
+  if (persistentTabKeys.includes(activeNavSection) && !selectedCharacter) {
+    return persistentTabs;
   }
 
   // If we're showing Start.gg features, render that instead of the normal dashboard
@@ -541,7 +563,7 @@ export default function NotesScreen({
             </Pressable>
             <Text style={styles.dashboardTitle}>Most Played Against</Text>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
             <View style={styles.dashboardCard}>
               <RecentCharactersCard
                 playerId={playerId}
@@ -593,7 +615,7 @@ export default function NotesScreen({
             </Pressable>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
             {opponentNotes.length > 0 ? (
               <View style={styles.dashboardCard}>
                 <View style={styles.dashboardCardHeader}>
@@ -626,65 +648,49 @@ export default function NotesScreen({
     const scheduleDays = ["Today", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Monday"];
 
     return (
+      <>
       <View style={[styles.dashboardShell, isDark && styles.dashboardShellDark]}>
         {isWideLayout ? renderSideRail("my-stuff") : null}
 
         <View style={styles.dashboardMain}>
           <View style={styles.dashboardTopBar}>
-            <Text style={styles.dashboardTitle}>My Stuff</Text>
+            <Text style={styles.dashboardTitle}>SmashNotes</Text>
             <View style={styles.topBarActions}>
-              {!isWideLayout && renderMobileNav("my-stuff")}
               <Pressable
                 style={styles.dashboardAddNoteBtn}
                 onPress={() => onQuickCreateNote(GENERAL_FIGHTER_NAME)}
               >
-                <Text style={styles.dashboardAddNoteLabel}>+ Add note</Text>
+                <Text style={styles.dashboardAddNoteLabel}>+ Note</Text>
               </Pressable>
-              <SelectMenuButton
-                value={userMainCharacter || MAIN_NONE_VALUE}
-                options={mainMenuOptions}
-                onSelect={handleMainMenuSelect}
-                disabled={isMainSaving}
-                searchable
-                searchPlaceholder="Search characters..."
-                onToggleOpen={(isOpen) => {
-                  if (isOpen) {
-                    setIsAccountMenuOpen(false);
-                  }
-                }}
-                anchorStyle={styles.mainSwitcherAnchor}
-                buttonStyle={styles.mainSwitcherBtn}
-                labelStyle={styles.mainSwitcherLabel}
-                caretStyle={styles.mainSwitcherCaret}
-                dropdownStyle={styles.mainSwitcherDropdown}
-                listStyle={styles.mainSwitcherList}
-                itemStyle={styles.mainSwitcherItem}
-                itemActiveStyle={styles.mainSwitcherItemActive}
-                itemLabelStyle={styles.mainSwitcherItemLabel}
-              />
-              {!isWideLayout ? (
-                <View style={styles.accountMenuAnchor}>
-                  <Pressable style={styles.accountBtn} onPress={() => setIsAccountMenuOpen((current) => !current)}>
-                    <Text style={styles.accountBtnLabel}>Account</Text>
-                  </Pressable>
-                  {isAccountMenuOpen ? renderAccountPanel("dropdown") : null}
-                </View>
-              ) : null}
             </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent}>
-            {/* Upcoming Tournament */}
-            <UpcomingTournamentCard
-              accessToken={accessToken}
-              playerGamerTag={startggUser?.player?.gamerTag}
-              allNotes={allNotes}
-              onNavigateToTournament={() => navigateTo("tournaments")}
-              onNavigateToPlayer={(tag) => {
-                setFilteredPlayerTag(tag);
-                setFilteredPlayerId(null);
-              }}
-            />
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+            {/* Upcoming Tournament or Connect Start.gg prompt */}
+            {startggIsAuthenticated && accessToken ? (
+              <UpcomingTournamentCard
+                accessToken={accessToken}
+                playerGamerTag={startggUser?.player?.gamerTag}
+                allNotes={allNotes}
+                onNavigateToTournament={(tournament) => {
+                  setPendingTournament(tournament);
+                  navigateTo("tournaments");
+                }}
+                onNavigateToPlayer={(tag) => {
+                  setFilteredPlayerTag(tag);
+                  setFilteredPlayerId(null);
+                }}
+              />
+            ) : (
+              <Pressable style={styles.connectCard} onPress={() => navigateTo("settings")}>
+                <Text style={styles.connectCardIcon}>🏆</Text>
+                <View style={styles.connectCardInfo}>
+                  <Text style={styles.connectCardTitle}>Connect Start.gg</Text>
+                  <Text style={styles.connectCardBody}>Link your account to see tournaments, opponents, stats, and matchup data.</Text>
+                </View>
+                <Text style={styles.connectCardArrow}>→</Text>
+              </Pressable>
+            )}
 
             {/* Quick Stats Row */}
             {allNotes && allNotes.length > 0 && (
@@ -744,39 +750,47 @@ export default function NotesScreen({
               ) : null}
             </View>
 
-            {/* Recent Opponents — 4 shown, View All goes to Players tab */}
-            <View style={styles.dashboardCard}>
-              <RecentOpponentsCard
-                playerId={playerId}
-                accessToken={accessToken}
-                refreshKey={dashboardRefreshKey}
-                notes={allNotes}
-                maxShown={4}
-                onSelectOpponent={(opponent) => {
-                  navigateTo("my-stuff");
-                  setFilteredPlayerTag(opponent.gamerTag);
-                  setFilteredPlayerId(opponent.playerId);
-                }}
-                onShowAll={() => navigateTo("players")}
-              />
-            </View>
+            {/* Recent Opponents — only if connected */}
+            {startggIsAuthenticated && accessToken && playerId && (
+              <View style={styles.dashboardCard}>
+                <RecentOpponentsCard
+                  playerId={playerId}
+                  accessToken={accessToken}
+                  refreshKey={dashboardRefreshKey}
+                  notes={allNotes}
+                  maxShown={4}
+                  onSelectOpponent={(opponent) => {
+                    navigateTo("my-stuff");
+                    setFilteredPlayerTag(opponent.gamerTag);
+                    setFilteredPlayerId(opponent.playerId);
+                  }}
+                  onShowAll={() => navigateTo("players")}
+                />
+              </View>
+            )}
 
-            {/* Most Played Against — 3 shown, View All expands */}
-            <View style={styles.dashboardCard}>
-              <RecentCharactersCard
-                playerId={playerId}
-                accessToken={accessToken}
-                refreshKey={dashboardRefreshKey}
-                onSelectCharacter={(characterName) => {
-                  if (onSelectCharacter) onSelectCharacter(characterName);
-                  navigateTo && navigateTo("my-stuff");
-                }}
-                onShowAll={() => setShowAllMatchups(true)}
-              />
-            </View>
+            {/* Most Played Against — only if connected */}
+            {startggIsAuthenticated && accessToken && playerId && (
+              <View style={styles.dashboardCard}>
+                <RecentCharactersCard
+                  playerId={playerId}
+                  accessToken={accessToken}
+                  refreshKey={dashboardRefreshKey}
+                  onSelectCharacter={(characterName) => {
+                    if (onSelectCharacter) onSelectCharacter(characterName);
+                    navigateTo && navigateTo("my-stuff");
+                  }}
+                  onShowAll={() => setShowAllMatchups(true)}
+                />
+              </View>
+            )}
           </ScrollView>
+          {!isWideLayout && renderMobileBottomNav("my-stuff")}
         </View>
       </View>
+      {/* Keep other tabs mounted but hidden */}
+      {persistentTabs}
+      </>
     );
   }
 
@@ -788,163 +802,111 @@ export default function NotesScreen({
     : `Search ${selectedCharacter} notes`;
 
   return (
-    <View style={[styles.screen, isDark && styles.screenDark]}>
-      <View style={styles.characterHeaderRow}>
-        <Pressable style={[styles.backBtn, isDark && styles.backBtnDark]} onPress={onBackToRoster}>
-          <Text style={styles.backBtnLabel}>Back</Text>
-        </Pressable>
-        <View style={styles.accountMenuAnchorCharacter}>
-          <Pressable
-            style={[styles.accountBtn, styles.accountBtnCharacter]}
-            onPress={() => setIsAccountMenuOpen((current) => !current)}
-          >
-            <Text style={styles.accountBtnLabel}>Account</Text>
+    <View style={[styles.dashboardShell, styles.dashboardShellDark]}>
+      {isWideLayout ? renderSideRail("my-stuff") : null}
+      <View style={styles.dashboardMain}>
+        {/* Top bar */}
+        <View style={styles.dashboardTopBar}>
+          {!isWideLayout && (
+            <Pressable style={styles.mobileBackBtn} onPress={onBackToRoster}>
+              <Text style={styles.mobileBackBtnLabel}>←</Text>
+            </Pressable>
+          )}
+          {isWideLayout && (
+            <Pressable style={styles.backToNotesBtn} onPress={onBackToRoster}>
+              <Text style={styles.backToNotesBtnLabel}>← Roster</Text>
+            </Pressable>
+          )}
+          <Text style={styles.dashboardTitle}>{selectedCharacter}</Text>
+          <Pressable style={styles.dashboardAddNoteBtn} onPress={onCreateNote}>
+            <Text style={styles.dashboardAddNoteLabel}>+ {createLabel}</Text>
           </Pressable>
-          {isAccountMenuOpen ? renderAccountPanel("character") : null}
         </View>
-      </View>
 
-      <View style={styles.heroCard}>
-        <View style={styles.heroIdentity}>
-          <View style={styles.heroIconWrap}>
-            <FighterTile
-              fighter={{ name: selectedCharacter, icon: getFighterIcon(selectedCharacter) }}
-              compact
-              onPress={() => {}}
-            />
+        {/* General / Matchups tabs */}
+        {!isGeneralNotebook ? (
+          <View style={styles.charTabRow}>
+            <Pressable
+              style={[styles.charTab, activeTab === "general" && styles.charTabActive]}
+              onPress={() => onSelectTab("general")}
+            >
+              <Text style={[styles.charTabLabel, activeTab === "general" && styles.charTabLabelActive]}>General</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.charTab, activeTab === "matchups" && styles.charTabActive]}
+              onPress={() => onSelectTab("matchups")}
+            >
+              <Text style={[styles.charTabLabel, activeTab === "matchups" && styles.charTabLabelActive]}>Matchups</Text>
+            </Pressable>
           </View>
-          <View style={styles.heroTextWrap}>
-            <Text style={styles.heroTitle}>{selectedCharacter}</Text>
-            <Text style={styles.heroSubtitle}>
-              {isGeneralNotebook
-                ? "Universal reminders, habits, and tournament prep."
-                : "Review general game plans or lock in matchup-specific notes."}
-            </Text>
-          </View>
-        </View>
-        <View style={styles.mainPickerBlockHero}>
-          <Text style={styles.mainPickerLabelHero}>Main Character</Text>
-          <SelectMenuButton
-            value={userMainCharacter || MAIN_NONE_VALUE}
-            options={mainMenuOptions}
-            onSelect={handleMainMenuSelect}
-            disabled={isMainSaving}
-            searchable
-            searchPlaceholder="Search characters..."
-            onToggleOpen={(isOpen) => {
-              if (isOpen) {
-                setIsAccountMenuOpen(false);
-              }
-            }}
-            anchorStyle={styles.mainMenuAnchorHero}
-            buttonStyle={styles.mainHeroButton}
-            labelStyle={styles.mainHeroButtonLabel}
-            caretStyle={styles.mainHeroButtonCaret}
-            dropdownStyle={styles.mainHeroDropdown}
-            listStyle={styles.mainHeroList}
-            itemStyle={styles.mainHeroItem}
-            itemActiveStyle={styles.mainHeroItemActive}
-            itemLabelStyle={styles.mainHeroItemLabel}
-            maxListHeight={198}
-          />
-          {isMainSaving ? <Text style={styles.mainSavingText}>Saving main...</Text> : null}
-        </View>
-      </View>
-
-      {isNotesLoading ? (
-        <View style={styles.syncRow}>
-          <ActivityIndicator size="small" color="#FF6B3D" />
-          <Text style={[styles.syncLabel, isDark && styles.syncLabelDark]}>Syncing notebook...</Text>
-        </View>
-      ) : null}
-
-      {!isGeneralNotebook ? (
-        <View style={styles.tabRow}>
-          <Pressable
-            style={[styles.tabButton, isDark && styles.tabButtonDark, activeTab === "general" && styles.tabButtonActive]}
-            onPress={() => onSelectTab("general")}
-          >
-            <Text style={[styles.tabLabel, isDark && styles.tabLabelDark, activeTab === "general" && styles.tabLabelActive]}>General</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tabButton, isDark && styles.tabButtonDark, activeTab === "matchups" && styles.tabButtonActive]}
-            onPress={() => onSelectTab("matchups")}
-          >
-            <Text style={[styles.tabLabel, isDark && styles.tabLabelDark, activeTab === "matchups" && styles.tabLabelActive]}>Matchups</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.characterContent}>
-        {showingMatchups ? (
-          <>
-            <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>Opponent Select</Text>
-            <TextInput
-              style={[styles.search, isDark && styles.searchDark]}
-              value={opponentSearch}
-              onChangeText={setOpponentSearch}
-              placeholder="Search opponents"
-              placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
-            />
-
-            <View style={styles.gridWrap}>
-              {visibleOpponents.map((fighter) => (
-                <FighterTile
-                  key={fighter.name}
-                  fighter={fighter}
-                  selected={fighter.name === selectedOpponent}
-                  compact
-                  onPress={onSelectOpponent}
-                />
-              ))}
-            </View>
-
-            {selectedOpponent ? (
-              <Text style={[styles.matchupHeading, isDark && styles.matchupHeadingDark]}>{selectedCharacter} vs {selectedOpponent}</Text>
-            ) : (
-              <View style={[styles.emptyStateCard, isDark && styles.emptyStateCardDark]}>
-                <Text style={[styles.emptyTitle, isDark && styles.emptyTitleDark]}>Pick an opponent</Text>
-                <Text style={[styles.emptyBody, isDark && styles.emptyBodyDark]}>Choose a fighter above to open matchup-specific notes.</Text>
-              </View>
-            )}
-          </>
         ) : null}
 
-        {(!showingMatchups || selectedOpponent) ? (
-          <>
-            <Text style={[styles.sectionTitle, isDark && styles.sectionTitleDark]}>Notebook</Text>
-            <TextInput
-              style={[styles.search, isDark && styles.searchDark]}
-              value={noteSearch}
-              onChangeText={setNoteSearch}
-              placeholder={noteSearchPlaceholder}
-              placeholderTextColor={isDark ? "#8A93A7" : "#98A2B3"}
-            />
-
-            {displayedNotes.length ? (
-              displayedNotes.map((note) => (
-                <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} />
-              ))
-            ) : (
-              <View style={[styles.emptyStateCard, isDark && styles.emptyStateCardDark]}>
-                <Text style={[styles.emptyTitle, isDark && styles.emptyTitleDark]}>No notes yet</Text>
-                <Text style={[styles.emptyBody, isDark && styles.emptyBodyDark]}>
-                  {showingMatchups
-                    ? "Start a matchup notebook for this pairing."
-                    : "Add a note for this fighter."}
-                </Text>
+        <ScrollView ref={charScrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={styles.dashboardContent} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
+          {showingMatchups ? (
+            <>
+              <TextInput
+                style={styles.charSearch}
+                value={opponentSearch}
+                onChangeText={setOpponentSearch}
+                placeholder="Search opponents..."
+                placeholderTextColor="#8A93A7"
+              />
+              <View style={styles.gridWrap}>
+                {safeVisibleOpponents.map((fighter) => (
+                  <FighterTile
+                    key={fighter.name}
+                    fighter={fighter}
+                    selected={fighter.name === selectedOpponent}
+                    compact
+                    onPress={(name) => {
+                      onSelectOpponent(name);
+                      // Auto-scroll down to show notes after selection
+                      setTimeout(() => {
+                        charScrollRef.current?.scrollToEnd?.({ animated: true });
+                      }, 100);
+                    }}
+                  />
+                ))}
               </View>
-            )}
-          </>
-        ) : null}
-      </ScrollView>
 
-      <Pressable
-        style={[styles.fab, showingMatchups && !canCreateMatchupNote && styles.fabDisabled]}
-        onPress={onCreateNote}
-      >
-        <Text style={styles.fabLabel}>+ {createLabel}</Text>
-      </Pressable>
+              {selectedOpponent ? (
+                <Text style={styles.charMatchupHeading}>{selectedCharacter} vs {selectedOpponent}</Text>
+              ) : (
+                <View style={styles.dashboardCard}>
+                  <Text style={styles.emptyTitleDark}>Pick an opponent</Text>
+                  <Text style={styles.emptyBodyDark}>Choose a fighter above to open matchup-specific notes.</Text>
+                </View>
+              )}
+            </>
+          ) : null}
+
+          {(!showingMatchups || selectedOpponent) ? (
+            <>
+              <TextInput
+                style={styles.charSearch}
+                value={noteSearch}
+                onChangeText={setNoteSearch}
+                placeholder={noteSearchPlaceholder}
+                placeholderTextColor="#8A93A7"
+              />
+              {safeDisplayedNotes.length ? (
+                safeDisplayedNotes.map((note) => (
+                  <NoteItem key={note.id} note={note} onEdit={onEditNote} onDelete={onDeleteNote} onSave={onSaveInlineEdit} onViewVod={handleViewVod} forceDark />
+                ))
+              ) : (
+                <View style={styles.dashboardCard}>
+                  <Text style={styles.emptyTitleDark}>No notes yet</Text>
+                  <Text style={styles.emptyBodyDark}>
+                    {showingMatchups ? "Start a matchup notebook for this pairing." : "Add a note for this fighter."}
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : null}
+        </ScrollView>
+
+        {!isWideLayout && renderMobileBottomNav("my-stuff")}
+      </View>
     </View>
   );
 }
@@ -1045,6 +1007,105 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "800",
     fontSize: 12,
+  },
+  // Mobile bottom nav
+  mobileBottomNav: {
+    flexDirection: "row",
+    backgroundColor: "#0D1117",
+    borderTopWidth: 1,
+    borderTopColor: "#1B2333",
+    paddingTop: 8,
+    paddingBottom: 20,
+    paddingHorizontal: 8,
+  },
+  mobileNavItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+  },
+  mobileNavPill: {
+    position: "absolute",
+    top: -8,
+    width: 20,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: "#FF6B3D",
+  },
+  mobileNavIcon: {
+    marginBottom: 2,
+  },
+  mobileNavLabel: {
+    color: "#4A5568",
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 0.2,
+  },
+  mobileNavLabelActive: {
+    color: "#F4F7FF",
+    fontWeight: "700",
+  },
+  // More sheet
+  moreOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    zIndex: 998,
+  },
+  moreSheet: {
+    position: "absolute",
+    bottom: 70,
+    left: 12,
+    right: 12,
+    backgroundColor: "#1B2333",
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    zIndex: 999,
+    boxShadow: "0 -4px 24px rgba(0,0,0,0.4)",
+  },
+  moreSheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#2A3449",
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  moreSheetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    gap: 12,
+  },
+  moreSheetItemActive: {
+    backgroundColor: "#141C2B",
+  },
+  moreSheetLabel: {
+    color: "#96A3BD",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  moreSheetLabelActive: {
+    color: "#F4F7FF",
+    fontWeight: "700",
+  },
+  mobileBackBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: "#2A3449",
+    marginRight: 8,
+  },
+  mobileBackBtnLabel: {
+    color: "#C9D4E8",
+    fontSize: 16,
+    fontWeight: "700",
   },
   startggBtn: {
     borderRadius: 8,
@@ -1455,6 +1516,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  connectCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E3254",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#2A4D9B",
+    gap: 12,
+  },
+  connectCardIcon: { fontSize: 32 },
+  connectCardInfo: { flex: 1 },
+  connectCardTitle: { color: "#F4F7FF", fontSize: 16, fontWeight: "800" },
+  connectCardBody: { color: "#96A3BD", fontSize: 12, marginTop: 4, lineHeight: 18 },
+  connectCardArrow: { color: "#6B9CFF", fontSize: 18 },
   quickStatsRow: {
     flexDirection: "row",
     gap: 10,
@@ -1513,7 +1590,7 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 30,
     fontWeight: "800",
-    color: "#1A2B48",
+    color: "#ECF2FF",
   },
   appTitleDark: {
     color: "#ECF2FF",
@@ -1528,7 +1605,7 @@ const styles = StyleSheet.create({
   },
   mainText: {
     marginTop: 6,
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -1539,7 +1616,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   mainPickerLabel: {
-    color: "#20304E",
+    color: "#C9D4E8",
     fontSize: 12,
     fontWeight: "700",
     marginBottom: 6,
@@ -1548,10 +1625,10 @@ const styles = StyleSheet.create({
     color: "#C9D4E8",
   },
   mainPickerWrap: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1B2333",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
     overflow: "hidden",
   },
   mainPickerWrapDark: {
@@ -1559,14 +1636,14 @@ const styles = StyleSheet.create({
     borderColor: "#2A3449",
   },
   mainPicker: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
     height: 48,
   },
   mainPickerDark: {
     color: "#ECF2FF",
   },
   signOutBtn: {
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
     borderRadius: 999,
     paddingVertical: 7,
     paddingHorizontal: 12,
@@ -1575,7 +1652,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#273348",
   },
   signOutLabel: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -1724,7 +1801,7 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: "center",
@@ -1736,7 +1813,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF6B3D",
   },
   tabLabel: {
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "800",
   },
   tabLabelDark: {
@@ -1746,14 +1823,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   search: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1B2333",
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
     marginBottom: 12,
-    color: "#1A2B48",
+    color: "#ECF2FF",
   },
   searchDark: {
     backgroundColor: "#1B2333",
@@ -1781,7 +1858,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
     marginBottom: 10,
   },
   sectionTitleDark: {
@@ -1790,7 +1867,7 @@ const styles = StyleSheet.create({
   matchupHeading: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#20304E",
+    color: "#C9D4E8",
     marginBottom: 12,
   },
   matchupHeadingDark: {
@@ -1803,10 +1880,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   emptyStateCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1B2333",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E6E8EB",
+    borderColor: "#2A3449",
     padding: 18,
     marginBottom: 12,
   },
@@ -1817,11 +1894,54 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontWeight: "700",
     fontSize: 20,
-    color: "#1A2B48",
+    color: "#ECF2FF",
     marginBottom: 8,
   },
   emptyTitleDark: {
     color: "#ECF2FF",
+  },
+  // Character view
+  charTabRow: {
+    flexDirection: "row",
+    gap: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1A2233",
+  },
+  charTab: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#141C2B",
+  },
+  charTabActive: {
+    backgroundColor: "#FF6B3D",
+  },
+  charTabLabel: {
+    color: "#637083",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  charTabLabelActive: {
+    color: "#fff",
+  },
+  charSearch: {
+    backgroundColor: "#1B2333",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    color: "#ECF2FF",
+    marginBottom: 12,
+    fontSize: 14,
+  },
+  charMatchupHeading: {
+    color: "#F4F7FF",
+    fontSize: 18,
+    fontWeight: "800",
+    marginVertical: 12,
   },
   emptyBody: {
     textAlign: "center",

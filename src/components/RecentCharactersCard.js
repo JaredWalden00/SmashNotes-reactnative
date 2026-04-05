@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontWeight: "700",
     fontSize: 16,
-    color: "#1A2B48",
+    color: "#C9D4E8",
     marginBottom: 6,
   },
   emptyTitleDark: {

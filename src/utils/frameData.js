@@ -1,4 +1,9 @@
-import frameDataJson from "../data/frameData.json";
+let frameDataJson = {};
+try {
+  frameDataJson = require("../data/frameData.json") || {};
+} catch (e) {
+  console.warn("[frameData] Failed to load frame data JSON:", e.message);
+}
 
 const BASE_URL = "https://ultimateframedata.com";
 

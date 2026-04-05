@@ -29,7 +29,7 @@ function timeAgo(date) {
   return `${Math.floor(seconds / 3600)}h ago`;
 }
 
-export default function TournamentTab({ allNotes, onCreateNoteSilent, onEditNote, onDeleteNote, onSaveInlineEdit, onViewVod, accessToken, playerGamerTag }) {
+export default function TournamentTab({ allNotes, onCreateNoteSilent, onEditNote, onDeleteNote, onSaveInlineEdit, onViewVod, accessToken, playerGamerTag, pendingTournament, onClearPendingTournament }) {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,6 +48,14 @@ export default function TournamentTab({ allNotes, onCreateNoteSilent, onEditNote
   const [inlineNoteContent, setInlineNoteContent] = useState("");
   const [viewingPlayer, setViewingPlayer] = useState(null); // gamerTag of player being viewed
   const pollRef = useRef(null);
+
+  // Auto-open a pending tournament from My Stuff card
+  useEffect(() => {
+    if (pendingTournament) {
+      handleSelectTournament(pendingTournament);
+      if (onClearPendingTournament) onClearPendingTournament();
+    }
+  }, [pendingTournament]);
 
   // Load tournaments
   useEffect(() => {
@@ -171,12 +179,6 @@ export default function TournamentTab({ allNotes, onCreateNoteSilent, onEditNote
         const nodes = data?.event?.sets?.nodes || [];
         const totalPages = data?.event?.sets?.pageInfo?.totalPages || 1;
 
-        console.log(`[TournamentTab] Event "${data?.event?.name}" (ID: ${selectedEventId}) page ${page}/${totalPages}: ${nodes.length} sets`);
-        if (nodes.length > 0 && page === 1) {
-          console.log(`[TournamentTab] Sample set entrants:`, nodes[0]?.slots?.map(s => s?.entrant?.name));
-          console.log(`[TournamentTab] Looking for playerGamerTag: "${playerGamerTag}"`);
-        }
-
         allNodes = allNodes.concat(nodes);
         if (page >= totalPages || nodes.length === 0) break;
       }
@@ -188,11 +190,6 @@ export default function TournamentTab({ allNotes, onCreateNoteSilent, onEditNote
         entrant2: set.slots?.[1]?.entrant || null,
       }));
 
-      console.log(`[TournamentTab] Total sets: ${normalized.length}, user matches: ${normalized.filter(s => {
-        const tag = playerGamerTag?.toLowerCase() || "";
-        const match = (e) => e?.participants?.some(p => p.gamerTag?.toLowerCase() === tag) || e?.name?.toLowerCase().includes(tag);
-        return match(s.entrant1) || match(s.entrant2);
-      }).length}`);
 
       setSets(normalized);
       setLastRefresh(new Date());

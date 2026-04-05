@@ -1,5 +1,11 @@
 import { useRef, useCallback, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { Platform } from "react-native";
+
+// createPortal only available on web
+let createPortal = null;
+if (Platform.OS === "web") {
+  try { createPortal = require("react-dom").createPortal; } catch (e) {}
+}
 import {
   View,
   StyleSheet,
@@ -353,6 +359,72 @@ export default function LiveTextEditor({
   character,
 }) {
   const isDark = useColorScheme() === "dark";
+
+  // On native (non-web), fall back to a basic TextInput with a simple formatting bar
+  if (Platform.OS !== "web") {
+    const { TextInput: NativeTextInput, TouchableOpacity } = require("react-native");
+    const nativeRef = useRef(null);
+    const nativeSelectionRef = useRef({ start: 0, end: 0 });
+
+    const insertMarkdown = (prefix, suffix) => {
+      const text = value || "";
+      const { start, end } = nativeSelectionRef.current;
+      const selected = text.slice(start, end);
+      const newText = text.slice(0, start) + prefix + selected + (suffix || prefix) + text.slice(end);
+      if (onChange) onChange(newText);
+    };
+
+    return (
+      <View style={[styles.container, isDark && styles.containerDark, style]}>
+        {/* Simple formatting toolbar for native */}
+        <View style={styles.nativeToolbar}>
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("**")}>
+            <Text style={styles.nativeToolbarBtnText}>B</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("_")}>
+            <Text style={[styles.nativeToolbarBtnText, { fontStyle: "italic" }]}>I</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("~~")}>
+            <Text style={[styles.nativeToolbarBtnText, { textDecorationLine: "line-through" }]}>S</Text>
+          </TouchableOpacity>
+          <View style={styles.nativeToolbarSep} />
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("# ", "")}>
+            <Text style={[styles.nativeToolbarBtnText, { fontSize: 11 }]}>H1</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("## ", "")}>
+            <Text style={[styles.nativeToolbarBtnText, { fontSize: 11 }]}>H2</Text>
+          </TouchableOpacity>
+          <View style={styles.nativeToolbarSep} />
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("- ", "")}>
+            <Text style={styles.nativeToolbarBtnText}>•</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.nativeToolbarBtn} onPress={() => insertMarkdown("`")}>
+            <Text style={[styles.nativeToolbarBtnText, { fontFamily: "monospace", fontSize: 13 }]}>&lt;&gt;</Text>
+          </TouchableOpacity>
+        </View>
+        <NativeTextInput
+          ref={nativeRef}
+          style={[{
+            minHeight,
+            padding: 14,
+            color: "#ECF2FF",
+            fontSize: 16,
+            lineHeight: 24,
+            textAlignVertical: "top",
+          }, editorStyle]}
+          value={value || ""}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor="#5A6B84"
+          multiline
+          scrollEnabled={false}
+          onSelectionChange={(e) => {
+            nativeSelectionRef.current = e.nativeEvent.selection;
+          }}
+        />
+      </View>
+    );
+  }
   const [fdOpen, setFdOpen] = useState(false);
   const [fdSearch, setFdSearch] = useState("");
   const [fdCharacter, setFdCharacter] = useState(character || "");
@@ -392,8 +464,9 @@ export default function LiveTextEditor({
 
   // Continuously save cursor position whenever selection changes inside the editor
   useEffect(() => {
+    if (typeof document === "undefined") return;
     function saveSelection() {
-      const sel = window.getSelection();
+      const sel = window.getSelection?.();
       if (sel && sel.rangeCount > 0 && editorRef.current?.contains(sel.anchorNode)) {
         savedSelectionRef.current = sel.getRangeAt(0).cloneRange();
       }
@@ -688,7 +761,7 @@ export default function LiveTextEditor({
           >
             <Text style={[styles.toolbarBtnLabel, isDark && styles.toolbarBtnLabelDark, { fontSize: 10, fontWeight: "800" }, fdOpen && styles.toolbarBtnLabelActive]}>FD</Text>
           </Pressable>
-          {fdHover && !fdOpen && typeof document !== "undefined" && createPortal(
+          {fdHover && !fdOpen && createPortal && typeof document !== "undefined" && createPortal(
             <div style={{
               position: "fixed",
               top: fdTooltipPos.top,
@@ -876,8 +949,8 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
-    backgroundColor: "#FFFFFF",
+    borderColor: "#344158",
+    backgroundColor: "#141C2B",
     overflow: "hidden",
   },
   containerDark: {
@@ -892,8 +965,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     gap: 2,
     borderBottomWidth: 1,
-    borderBottomColor: "#E4E8EF",
-    backgroundColor: "#F8FAFD",
+    borderBottomColor: "#2A3449",
+    backgroundColor: "#1B2333",
   },
   toolbarDark: {
     borderBottomColor: "#2A3449",
@@ -907,13 +980,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   toolbarBtnActive: {
-    backgroundColor: "#DDE4F0",
+    backgroundColor: "#2A4D9B",
   },
   toolbarBtnActiveDark: {
     backgroundColor: "#2A4D9B",
   },
   toolbarBtnLabel: {
-    color: "#3A4A66",
+    color: "#8A93A7",
     fontSize: 14,
     fontWeight: "700",
   },
@@ -921,12 +994,12 @@ const styles = StyleSheet.create({
     color: "#8A93A7",
   },
   toolbarBtnLabelActive: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
   },
   separator: {
     width: 1,
     height: 18,
-    backgroundColor: "#D8DDE5",
+    backgroundColor: "#344158",
     marginHorizontal: 4,
   },
   separatorDark: {
@@ -935,10 +1008,39 @@ const styles = StyleSheet.create({
   editorWrap: {
     flex: 1,
   },
-  fdPopup: {
-    backgroundColor: "#F8FAFD",
+  // Native toolbar
+  nativeToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    gap: 2,
     borderBottomWidth: 1,
-    borderBottomColor: "#E4E8EF",
+    borderBottomColor: "#2A3449",
+    backgroundColor: "#1B2333",
+  },
+  nativeToolbarBtn: {
+    width: 34,
+    height: 30,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nativeToolbarBtnText: {
+    color: "#8A93A7",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  nativeToolbarSep: {
+    width: 1,
+    height: 18,
+    backgroundColor: "#344158",
+    marginHorizontal: 4,
+  },
+  fdPopup: {
+    backgroundColor: "#141C2B",
+    borderBottomWidth: 1,
+    borderBottomColor: "#2A3449",
     padding: 8,
   },
   fdPopupDark: {
@@ -1006,11 +1108,11 @@ const styles = StyleSheet.create({
   fdTooltip: {
     position: "fixed",
     width: 280,
-    backgroundColor: "#F8FAFD",
+    backgroundColor: "#1B2333",
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#2A3449",
     zIndex: 99999,
     boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
     pointerEvents: "none",

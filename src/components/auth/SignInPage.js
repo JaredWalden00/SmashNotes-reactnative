@@ -1,4 +1,4 @@
-import { Image, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import Svg, { Path } from "react-native-svg";
 
 function GoogleMarkIcon() {
@@ -29,7 +29,8 @@ export default function SignInPage({
   const mascotIcon = require("../../SmashIcons/General.png");
 
   return (
-    <View style={styles.authScreen}>
+    <KeyboardAvoidingView style={styles.authScreen} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView contentContainerStyle={styles.authScrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={[styles.frame, isWide ? styles.frameWide : styles.frameStack]}>
         <View style={[styles.illustrationPane, isWide ? styles.illustrationPaneWide : styles.illustrationPaneStack]}>
           <View style={[styles.planet, styles.planetTop]} />
@@ -103,16 +104,21 @@ export default function SignInPage({
           </View>
         </View>
       </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   authScreen: {
     flex: 1,
+    backgroundColor: "#050A17",
+  },
+  authScrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 18,
-    backgroundColor: "#050A17",
+    paddingVertical: 20,
   },
   frame: {
     borderWidth: 1,

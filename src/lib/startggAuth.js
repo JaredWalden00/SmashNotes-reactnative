@@ -1,6 +1,8 @@
 import { AuthRequest, makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Complete the auth session
@@ -12,14 +14,59 @@ const START_GG_REFRESH_ENDPOINT = 'https://api.start.gg/oauth/refresh';
 
 export class StartGGAuth {
   constructor() {
-    this.clientId = process.env.EXPO_PUBLIC_START_GG_CLIENT_ID;
-    this.clientSecret = process.env.START_GG_CLIENT_SECRET;
-    // Use the EXACT redirect URI configured in Start.gg OAuth app
-    this.redirectUri = 'http://localhost:8081/auth/callback'; // Must match Start.gg app settings
-    // Debug: Log the redirect URI being used  
-    console.log('OAuth Config:');
+    const isNative = Platform.OS !== 'web';
+
+    if (isNative) {
+      // Native iOS/Android — OAuth redirects to the Express server which handles the exchange
+      const debuggerHost = Constants.expoConfig?.hostUri
+        || Constants.manifest?.debuggerHost
+        || Constants.manifest2?.extra?.expoGo?.debuggerHost
+        || '';
+      this.lanIp = debuggerHost.split(':')[0] || '192.168.1.55';
+      this.clientId = process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID || '450';
+      // Redirect to the Express server's callback handler (port 3001)
+      this.redirectUri = `http://${this.lanIp}:3001/auth/native/callback`;
+      this.isNative = true;
+      console.log('OAuth Config (Native):');
+      console.log('- LAN IP from Expo:', this.lanIp);
+    } else {
+      // Web — detect localhost vs LAN IP
+      let hostname = null;
+      try {
+        if (typeof window !== 'undefined' && window.location) {
+          hostname = window.location.hostname || null;
+        }
+      } catch (e) {}
+
+      const isLocalhost = !hostname || hostname === 'localhost' || hostname === '127.0.0.1';
+      const isLAN = hostname && /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+      let origin = null;
+      try { origin = window.location.origin; } catch (e) {}
+
+      if (isLocalhost) {
+        this.clientId = process.env.EXPO_PUBLIC_START_GG_CLIENT_ID || '442';
+        this.redirectUri = 'http://localhost:8081/auth/callback';
+      } else if (isLAN) {
+        // Mobile web via LAN IP
+        this.clientId = process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID || '450';
+        this.redirectUri = `http://${hostname}:8081/auth/callback`;
+      } else {
+        // Deployed (Vercel, etc.) — use production client ID and origin
+        this.clientId = process.env.EXPO_PUBLIC_START_GG_PROD_CLIENT_ID || '455';
+        this.redirectUri = `${origin}/auth/callback`;
+      }
+      this.isNative = false;
+      console.log(`OAuth Config (Web ${isLocalhost ? 'Desktop' : isLAN ? 'LAN' : 'Deployed'}):`);
+      console.log('- hostname:', hostname);
+      console.log('- origin:', origin);
+      console.log('- isLocalhost:', isLocalhost);
+      console.log('- isLAN:', isLAN);
+    }
+
     console.log('- Client ID:', this.clientId);
     console.log('- Redirect URI:', this.redirectUri);
+    console.log('- EXPO_PUBLIC_START_GG_PROD_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_PROD_CLIENT_ID);
+    console.log('- EXPO_PUBLIC_START_GG_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_CLIENT_ID);
   }
 
   // Return config object for useAuthRequest
@@ -44,13 +91,20 @@ export class StartGGAuth {
       // Try the backend proxy first, fall back to direct exchange
       let data;
       try {
-        const backendResponse = await fetch('http://localhost:3001/api/startgg/exchange', {
+        // On deployed sites use /api/startgg-exchange, on dev use localhost:3001
+        const backendHost = (typeof window !== 'undefined' && window.location && window.location.hostname) ? window.location.hostname : 'localhost';
+        const isDeployed = backendHost && backendHost !== 'localhost' && backendHost !== '127.0.0.1' && !/^\d+\.\d+\.\d+\.\d+$/.test(backendHost);
+        const exchangeUrl = isDeployed
+          ? `${window.location.origin}/api/startgg-exchange`
+          : `http://${backendHost}:3001/api/startgg/exchange`;
+        const backendResponse = await fetch(exchangeUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             code,
             redirect_uri: this.redirectUri,
             code_verifier: codeVerifier,
+            client_id: this.clientId,
           }),
         });
         data = await backendResponse.json();
@@ -193,7 +247,6 @@ export function useStartGGAuth() {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
 
-  const { useMemo } = require('react');
   const authService = useMemo(() => new StartGGAuth(), []);
 
   // Discovery object for expo-auth-session
@@ -229,7 +282,7 @@ export function useStartGGAuth() {
       const code = params.get('code');
       if (code) {
         // Clean the URL so a page refresh doesn't re-trigger
-        window.history.replaceState({}, '', window.location.pathname);
+        window.history.replaceState({}, '', '/');
         handleAuthSuccess(code);
         return; // skip normal checkAuthStatus — handleAuthSuccess will set state
       }
@@ -335,8 +388,48 @@ export function useStartGGAuth() {
  const login = async () => {
   try {
     setIsLoading(true);
-    console.log('Prompting OAuth login...');
-    await promptAsync();
+    if (authService.isNative) {
+      // Native: open browser to Start.gg OAuth, redirect to our server
+      const authUrl = `https://start.gg/oauth/authorize?response_type=code&client_id=${authService.clientId}&scope=user.identity%20user.email&redirect_uri=${encodeURIComponent(authService.redirectUri)}`;
+      console.log('Opening native OAuth:', authUrl);
+      await WebBrowser.openBrowserAsync(authUrl);
+
+      // After browser closes, poll the server for the token
+      console.log('Browser closed, polling for token...');
+      const serverHost = authService.lanIp || 'localhost';
+      for (let i = 0; i < 12; i++) { // Poll for up to 60 seconds
+        await new Promise((r) => setTimeout(r, 5000));
+        try {
+          const resp = await fetch(`http://${serverHost}:3001/auth/native/token`);
+          const data = await resp.json();
+          if (data.access_token) {
+            console.log('Got token from server!');
+            await AsyncStorage.setItem('startgg_access_token', data.access_token);
+            await AsyncStorage.setItem('startgg_refresh_token', data.refresh_token || '');
+            await AsyncStorage.setItem('startgg_token_expires', String(Date.now() + (data.expires_in * 1000)));
+            setAccessToken(data.access_token);
+            // Fetch and store user info
+            try {
+              const userInfo = await fetchUserInfo(data.access_token);
+              console.log('Native auth: fetched user info', userInfo?.player?.gamerTag);
+            } catch (e) {
+              console.warn('Native auth: failed to fetch user info', e.message);
+            }
+            setIsAuthenticated(true);
+            setIsLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.log('Poll attempt', i + 1, '- waiting...');
+        }
+      }
+      console.warn('Token polling timed out');
+      setIsLoading(false);
+    } else {
+      // Web: use expo-auth-session redirect flow
+      console.log('Prompting OAuth login...');
+      await promptAsync();
+    }
   } catch (error) {
     console.error('Login failed:', error);
     setIsLoading(false);

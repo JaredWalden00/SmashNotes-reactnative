@@ -1,4 +1,5 @@
-import { SafeAreaView, StatusBar, StyleSheet, useColorScheme } from "react-native";
+import React from "react";
+import { SafeAreaView, StatusBar, StyleSheet, useColorScheme, View, Text, ScrollView } from "react-native";
 import { StatusBar as ExpoStatusBar } from "expo-status-bar";
 import AuthScreen from "./src/components/AuthScreen";
 import LoadingScreen from "./src/components/LoadingScreen";
@@ -10,7 +11,30 @@ import { useAuth } from "./src/hooks/useAuth";
 import { useNotes } from "./src/hooks/useNotes";
 import { useStatusPopup } from "./src/hooks/useStatusPopup";
 
-export default function App() {
+class ErrorBoundary extends React.Component {
+  state = { error: null };
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    console.error('[ErrorBoundary]', error.message);
+    console.error('[ErrorBoundary Stack]', info.componentStack);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={{ flex: 1, backgroundColor: "#0F1420", padding: 40, justifyContent: "center" }}>
+          <Text style={{ color: "#F87171", fontSize: 20, fontWeight: "800", marginBottom: 12 }}>App Error</Text>
+          <ScrollView>
+            <Text style={{ color: "#ECF2FF", fontSize: 13, lineHeight: 20 }}>{this.state.error.message}</Text>
+            <Text style={{ color: "#637083", fontSize: 11, marginTop: 12, lineHeight: 18 }}>{this.state.error.stack}</Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppInner() {
   // Start.gg OAuth
   const {
     user: startggUser,
@@ -232,6 +256,14 @@ export default function App() {
 
       <StatusModal statusPopup={statusPopup} onClose={closeStatusPopup} />
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
 

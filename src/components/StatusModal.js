@@ -88,13 +88,13 @@ const styles = StyleSheet.create({
     color: "#A62A3A",
   },
   statusTitleInfo: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
   },
   statusTitleInfoDark: {
     color: "#ECF2FF",
   },
   statusMessage: {
-    color: "#4D5B72",
+    color: "#A8B5CB",
     lineHeight: 21,
   },
   statusMessageDark: {

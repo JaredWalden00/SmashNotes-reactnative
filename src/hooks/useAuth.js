@@ -3,6 +3,13 @@ import { Platform } from "react-native";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { supabase } from "../lib/supabase";
+
+function getRedirectUrl(path) {
+  if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/${path}`;
+  }
+  return Linking.createURL(path);
+}
 import { isRateLimitError } from "../utils/appHelpers";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -53,6 +60,17 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     }
 
     bootstrapSession();
+
+    // Clean up auth callback URLs — redirect to root after a short delay
+    // to let Supabase process the hash fragment tokens first
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.location) {
+      const path = window.location.pathname;
+      if (path.includes("/auth/callback") || path.includes("/auth/reset-password")) {
+        setTimeout(() => {
+          window.history.replaceState({}, '', '/');
+        }, 2000);
+      }
+    }
 
     const {
       data: { subscription },
@@ -193,7 +211,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     setIsAuthSubmitting(true);
 
     try {
-      const redirectTo = Linking.createURL("auth/callback");
+      const redirectTo = getRedirectUrl("auth/callback");
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -297,7 +315,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
     setIsAuthSubmitting(true);
 
     try {
-      const redirectTo = Linking.createURL("auth/reset-password");
+      const redirectTo = getRedirectUrl("auth/reset-password");
       const { error } = await supabase.auth.resetPasswordForEmail(authEmail.trim(), {
         redirectTo,
       });

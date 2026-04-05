@@ -41,13 +41,13 @@ export default function NoteEditorModal({
 }) {
   const isDark = useColorScheme() === "dark";
   const [customSectionInput, setCustomSectionInput] = useState("");
-  const activeSections = editorSectionKeys.map((key) => ({
+  const activeSections = (editorSectionKeys || []).map((key) => ({
     key,
     label: getSectionLabel(key),
     placeholder: getSectionPlaceholder(key),
   }));
-  const availableSections = NOTE_SECTION_OPTIONS.filter((section) => !editorSectionKeys.includes(section.key));
-  const characterOptions = SMASH_FIGHTERS.map((fighter) => ({
+  const availableSections = (NOTE_SECTION_OPTIONS || []).filter((section) => !(editorSectionKeys || []).includes(section.key));
+  const characterOptions = (SMASH_FIGHTERS || []).map((fighter) => ({
     label: fighter.name,
     value: fighter.name,
   }));
@@ -61,11 +61,15 @@ export default function NoteEditorModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={[styles.modalBackdrop, isDark && styles.modalBackdropDark]}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      <View style={[styles.modalBackdrop, isDark && styles.modalBackdropDark]}>
         <View style={[styles.modalCard, isDark && styles.modalCardDark]}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={Platform.OS !== "web"}
+            keyboardDismissMode="interactive"
+          >
           <View style={styles.titleFieldWrap}>
             <Text style={[styles.titleFieldLabel, isDark && styles.sectionLabelDark]}>Title</Text>
             <TextInput
@@ -77,7 +81,7 @@ export default function NoteEditorModal({
               maxLength={80}
             />
           </View>
-          <View style={styles.topCharacterWrap}>
+          <View style={[styles.topCharacterWrap, { zIndex: 320 }]}>
             <Text style={[styles.topCharacterLabel, isDark && styles.sectionLabelDark]}>Character</Text>
             <SelectMenuButton
               value={draftCharacter}
@@ -128,8 +132,6 @@ export default function NoteEditorModal({
               </View>
             </View>
           ) : null}
-
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
             {availableSections.length ? (
               <View style={styles.addSectionWrap}>
                 <Text style={[styles.sectionLabel, isDark && styles.sectionLabelDark]}>Add section</Text>
@@ -213,7 +215,7 @@ export default function NoteEditorModal({
                 </View>
               );
             })}
-          </ScrollView>
+
 
           <View style={styles.modalActions}>
             <Pressable style={[styles.modalBtn, styles.cancelBtn, isDark && styles.cancelBtnDark]} onPress={onClose}>
@@ -223,8 +225,9 @@ export default function NoteEditorModal({
               <Text style={[styles.modalBtnText, styles.saveBtnText]}>Save</Text>
             </Pressable>
           </View>
+          </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -232,20 +235,21 @@ export default function NoteEditorModal({
 const styles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(15, 23, 42, 0.36)",
+    backgroundColor: "rgba(4, 8, 18, 0.7)",
     justifyContent: "flex-end",
   },
   modalBackdropDark: {
-    backgroundColor: "rgba(4, 8, 18, 0.62)",
+    backgroundColor: "rgba(4, 8, 18, 0.7)",
   },
   modalCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#101521",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 18,
     paddingTop: 18,
-    paddingBottom: 26,
-    height: "86%",
+    paddingBottom: 10,
+    flex: 1,
+    marginTop: 40,
     overflow: "visible",
   },
   modalCardDark: {
@@ -253,11 +257,12 @@ const styles = StyleSheet.create({
   },
   modalHeaderInput: {
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    color: "#1A2B48",
+    color: "#ECF2FF",
+    backgroundColor: "#141C2B",
     fontSize: 22,
     fontWeight: "800",
     marginBottom: 10,
@@ -274,7 +279,7 @@ const styles = StyleSheet.create({
   },
   titleFieldLabel: {
     marginBottom: 6,
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "800",
     fontSize: 13,
   },
@@ -345,17 +350,18 @@ const styles = StyleSheet.create({
   },
   playerTagInput: {
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 11,
-    color: "#1A2B48",
+    color: "#ECF2FF",
+    backgroundColor: "#141C2B",
     fontSize: 15,
     outlineStyle: "none",
   },
   topCharacterLabel: {
     marginBottom: 6,
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "800",
     fontSize: 13,
   },
@@ -408,7 +414,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   scrollContent: {
-    paddingBottom: 8,
+    paddingBottom: 40,
     overflow: "visible",
     zIndex: 1,
   },
@@ -435,7 +441,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     marginBottom: 0,
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "800",
     fontSize: 13,
   },
@@ -460,8 +466,8 @@ const styles = StyleSheet.create({
   sectionChip: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
-    backgroundColor: "#F8FAFD",
+    borderColor: "#344158",
+    backgroundColor: "#182131",
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
@@ -470,7 +476,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#182131",
   },
   sectionChipLabel: {
-    color: "#20304E",
+    color: "#C9D4E8",
     fontWeight: "700",
     fontSize: 12,
   },
@@ -495,11 +501,12 @@ const styles = StyleSheet.create({
   customSectionInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 9,
-    color: "#1A2B48",
+    color: "#ECF2FF",
+    backgroundColor: "#141C2B",
   },
   addCustomBtn: {
     borderRadius: 10,
@@ -519,15 +526,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: "#FFEDED",
+    backgroundColor: "#3A242B",
   },
   orderSectionBtn: {
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#CFD7E6",
+    borderColor: "#4A5D7F",
     paddingHorizontal: 9,
     paddingVertical: 5,
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
   },
   orderSectionBtnDark: {
     borderColor: "#4A5D7F",
@@ -537,7 +544,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   orderSectionLabel: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
     fontWeight: "800",
     fontSize: 11,
   },
@@ -554,12 +561,13 @@ const styles = StyleSheet.create({
   },
   inputBody: {
     borderWidth: 1,
-    borderColor: "#D8DDE5",
+    borderColor: "#344158",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 110,
-    color: "#1A2B48",
+    color: "#ECF2FF",
+    backgroundColor: "#141C2B",
     fontSize: 15,
     lineHeight: 22,
     outlineStyle: "none",
@@ -581,16 +589,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   cancelBtn: {
-    backgroundColor: "#EEF1F5",
+    backgroundColor: "#273348",
   },
   cancelBtnDark: {
     backgroundColor: "#273348",
   },
   saveBtn: {
-    backgroundColor: "#2A4D9B",
+    backgroundColor: "#FF6B3D",
   },
   modalBtnText: {
-    color: "#1A2B48",
+    color: "#ECF2FF",
     fontWeight: "700",
   },
   modalBtnTextDark: {

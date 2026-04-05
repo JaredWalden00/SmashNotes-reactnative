@@ -26,15 +26,17 @@ export default function SelectMenuButton({
   const containerRef = useRef(null);
   const searchRef = useRef(null);
 
+  const safeOptions = options || [];
+
   const selectedOption = useMemo(
-    () => options.find((option) => option.value === value),
-    [options, value],
+    () => safeOptions.find((option) => option.value === value),
+    [safeOptions, value],
   );
 
   const filteredOptions = useMemo(() => {
-    if (!searchable || !search.trim()) return options;
+    if (!searchable || !search.trim()) return safeOptions;
     const query = search.trim().toLowerCase();
-    return options.filter((option) => option.label.toLowerCase().includes(query));
+    return safeOptions.filter((option) => option.label.toLowerCase().includes(query));
   }, [options, search, searchable]);
 
   function toggleOpen() {
