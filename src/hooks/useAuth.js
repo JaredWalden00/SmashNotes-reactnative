@@ -31,6 +31,15 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
   useEffect(() => {
     let isMounted = true;
 
+    function cleanAuthUrl() {
+      if (Platform.OS === "web" && typeof window !== "undefined" && window.location) {
+        const path = window.location.pathname;
+        if (path.includes("/auth/callback") || path.includes("/auth/reset-password")) {
+          window.history.replaceState({}, '', '/');
+        }
+      }
+    }
+
     async function bootstrapSession() {
       try {
         const {
@@ -44,6 +53,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
 
         if (isMounted) {
           setSession(initialSession || null);
+          cleanAuthUrl();
         }
       } catch (error) {
         if (isRateLimitError(error)) {
@@ -52,6 +62,7 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
         }
 
         showStatusPopup("error", "Auth error", "Could not restore your login session.");
+        cleanAuthUrl();
       } finally {
         if (isMounted) {
           setIsAuthLoading(false);
@@ -61,20 +72,10 @@ export function useAuth({ showStatusPopup, showServerOverloadedPopup }) {
 
     bootstrapSession();
 
-    // Clean up auth callback URLs — redirect to root after a short delay
-    // to let Supabase process the hash fragment tokens first
-    if (Platform.OS === "web" && typeof window !== "undefined" && window.location) {
-      const path = window.location.pathname;
-      if (path.includes("/auth/callback") || path.includes("/auth/reset-password")) {
-        setTimeout(() => {
-          window.history.replaceState({}, '', '/');
-        }, 2000);
-      }
-    }
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      cleanAuthUrl();
       if (event === "PASSWORD_RECOVERY") {
         setIsPasswordRecovery(true);
         setAuthMode("signin");
