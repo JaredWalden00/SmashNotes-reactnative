@@ -178,14 +178,16 @@ export default function PlayersTab({ allNotes, onEditNote, onDeleteNote, onSaveI
   const [expandedPlayer, setExpandedPlayer] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
   const [recentOpponents, setRecentOpponents] = useState([]);
+  const [tournamentPlayers, setTournamentPlayers] = useState([]);
   const [opponentsLoading, setOpponentsLoading] = useState(false);
   const [opponentsLoadingMore, setOpponentsLoadingMore] = useState(false);
+  const [playersLoading, setPlayersLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const opponentMapRef = useRef({});
   const playerGamerTagRef = useRef(null);
   const currentPageRef = useRef(0);
   const hasMoreRef = useRef(true);
-  const MAX_PAGES = 5;
+  const MAX_PAGES = 15;
 
   function processSetsBatch(sets) {
     const map = opponentMapRef.current;
@@ -297,6 +299,89 @@ export default function PlayersTab({ allNotes, onEditNote, onDeleteNote, onSaveI
       .map((p) => ({ ...p, characters: Array.from(p.characters) }))
       .sort((a, b) => b.notes.length - a.notes.length);
   }, [allNotes]);
+
+  // Load tournament attendees (players from registered tournaments)
+  useEffect(() => {
+    if (!accessToken) return;
+    let mounted = true;
+    setPlayersLoading(true);
+
+    async function loadTournamentPlayers() {
+      try {
+        const { getUserRegisteredTournaments } = require("../utils/startggData");
+        const tournaments = await getUserRegisteredTournaments({ perPage: 20 });
+        const playerMap = {};
+
+        // Fetch attendees for each tournament's singles events
+        for (const tournament of tournaments.slice(0, 10)) {
+          const events = tournament.smashEvents || tournament.events || [];
+          const singlesEvent = events.find((e) => /singles/i.test(e.name) && !/doubles|redemption/i.test(e.name)) || events[0];
+          if (!singlesEvent) continue;
+
+          try {
+            const query = `
+              query EventEntrants($eventId: ID!) {
+                event(id: $eventId) {
+                  entrants(query: { perPage: 100 }) {
+                    nodes {
+                      id
+                      name
+                      initialSeedNum
+                      participants {
+                        id
+                        gamerTag
+                        prefix
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const data = await startggGraphQL(query, { eventId: String(singlesEvent.id) }, accessToken);
+            const entrants = data?.event?.entrants?.nodes || [];
+            for (const entrant of entrants) {
+              for (const p of (entrant.participants || [])) {
+                if (p.gamerTag) {
+                  const key = p.gamerTag.toLowerCase();
+                  if (!playerMap[key]) {
+                    playerMap[key] = {
+                      gamerTag: p.gamerTag,
+                      prefix: p.prefix || null,
+                      playerId: p.id,
+                      tournaments: [],
+                    };
+                  }
+                  if (!playerMap[key].tournaments.includes(tournament.name)) {
+                    playerMap[key].tournaments.push(tournament.name);
+                  }
+                }
+              }
+            }
+          } catch { /* skip this event */ }
+        }
+
+        if (mounted) {
+          setTournamentPlayers(
+            Object.values(playerMap).sort((a, b) => a.gamerTag.toLowerCase().localeCompare(b.gamerTag.toLowerCase()))
+          );
+        }
+      } catch {}
+      if (mounted) setPlayersLoading(false);
+    }
+
+    loadTournamentPlayers();
+    return () => { mounted = false; };
+  }, [accessToken]);
+
+  // Filter tournament players by search
+  const filteredTournamentPlayers = useMemo(() => {
+    if (!search.trim()) return [];
+    const q = search.trim().toLowerCase();
+    return tournamentPlayers.filter((p) =>
+      p.gamerTag.toLowerCase().includes(q) ||
+      (p.prefix && p.prefix.toLowerCase().includes(q))
+    ).slice(0, 20);
+  }, [tournamentPlayers, search]);
 
   const filteredLocal = useMemo(() => {
     if (!search.trim()) return players;
@@ -443,13 +528,88 @@ export default function PlayersTab({ allNotes, onEditNote, onDeleteNote, onSaveI
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Search bar */}
-      <TextInput
-        style={styles.search}
-        value={search}
-        onChangeText={setSearch}
-        placeholder="Search players..."
-        placeholderTextColor="#8A93A7"
-      />
+      <View style={styles.searchSection}>
+        <TextInput
+          style={styles.search}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search tournament players..."
+          placeholderTextColor="#8A93A7"
+        />
+        {playersLoading && !tournamentPlayers.length && (
+          <ActivityIndicator size="small" color="#FF6B3D" style={styles.searchSpinner} />
+        )}
+      </View>
+
+      {/* Tournament player search results */}
+      {filteredTournamentPlayers.length > 0 && (
+        <View style={styles.searchResultsSection}>
+          <Text style={styles.searchResultsTitle}>Tournament Players</Text>
+          {filteredTournamentPlayers.map((p) => {
+            const noteCount = (allNotes || []).filter(
+              (n) => n.playerTag && n.playerTag.toLowerCase() === p.gamerTag.toLowerCase()
+            ).length;
+            return (
+              <Pressable
+                key={p.gamerTag}
+                style={styles.searchResultRow}
+                onPress={() => handleViewProfile(p.gamerTag)}
+              >
+                <View style={styles.searchResultAvatar}>
+                  <Text style={styles.searchResultAvatarText}>{p.gamerTag[0]?.toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.searchResultTag}>
+                    {p.prefix ? `${p.prefix} | ` : ""}{p.gamerTag}
+                  </Text>
+                  <Text style={styles.searchResultTournament} numberOfLines={1}>
+                    {p.tournaments.slice(0, 2).join(", ")}
+                  </Text>
+                </View>
+                {noteCount > 0 ? (
+                  <Text style={styles.searchResultNotes}>{noteCount} note{noteCount !== 1 ? "s" : ""}</Text>
+                ) : (
+                  <Pressable
+                    style={styles.trackFromSearchBtn}
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      if (onTrackPlayer) {
+                        onTrackPlayer({ gamerTag: p.gamerTag, playerId: p.playerId });
+                      }
+                    }}
+                  >
+                    <Text style={styles.trackFromSearchLabel}>+ Track</Text>
+                  </Pressable>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Loading indicator for tournament players */}
+      {playersLoading && (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" color="#FF6B3D" />
+          <Text style={styles.loadingText}>Loading tournament attendees...</Text>
+        </View>
+      )}
+
+      {/* No results */}
+      {search.trim().length >= 2 && !playersLoading && filteredTournamentPlayers.length === 0 && filteredLocal.length === 0 && filteredOpponents.length === 0 && (
+        <Pressable
+          style={styles.noResultTrackBtn}
+          onPress={() => {
+            if (onTrackPlayer && search.trim()) {
+              onTrackPlayer({ gamerTag: search.trim(), playerId: null });
+              setSearch("");
+            }
+          }}
+        >
+          <Text style={styles.noResultText}>No player found for "{search.trim()}"</Text>
+          <Text style={styles.noResultAction}>Tap to track "{search.trim()}" anyway →</Text>
+        </Pressable>
+      )}
 
       {/* Recent opponents from Start.gg */}
       {recentOpponents.length > 0 && (
@@ -791,4 +951,53 @@ const styles = StyleSheet.create({
   },
   totalWrap: { alignItems: "center", paddingVertical: 16 },
   totalText: { color: "#637083", fontSize: 12, fontWeight: "600" },
+  // Search section
+  searchSection: { position: "relative", marginBottom: 12 },
+  searchSpinner: { position: "absolute", right: 14, top: 14 },
+  // Search results
+  searchResultsSection: {
+    backgroundColor: "#1B2333",
+    borderRadius: 14,
+    padding: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+  },
+  searchResultsTitle: { color: "#96A3BD", fontSize: 11, fontWeight: "700", marginBottom: 8, paddingHorizontal: 4 },
+  searchResultRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1A2233",
+  },
+  searchResultAvatar: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: "#2A4D9B", justifyContent: "center", alignItems: "center",
+  },
+  searchResultAvatarText: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  searchResultTag: { color: "#F4F7FF", fontSize: 14, fontWeight: "700" },
+  searchResultTournament: { color: "#637083", fontSize: 11, marginTop: 2 },
+  searchResultNotes: { color: "#6B9CFF", fontSize: 11, fontWeight: "700" },
+  trackFromSearchBtn: {
+    backgroundColor: "#FF6B3D",
+    borderRadius: 6,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  trackFromSearchLabel: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  // No result
+  noResultTrackBtn: {
+    backgroundColor: "#1B2333",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#2A3449",
+    alignItems: "center",
+  },
+  noResultText: { color: "#96A3BD", fontSize: 13 },
+  noResultAction: { color: "#FF6B3D", fontSize: 13, fontWeight: "700", marginTop: 4 },
 });

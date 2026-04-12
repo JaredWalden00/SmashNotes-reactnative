@@ -34,7 +34,13 @@
       "Bash(npm list:*)",
       "Bash(grep -l isDeployed dist/_expo/static/js/web/*.js)",
       "Bash(grep isDeployed dist/_expo/static/js/web/*.js)",
-      "Bash(grep startgg-exchange:*)"
+      "Bash(grep startgg-exchange:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls -la \"C:/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/\"*.env*)",
+      "Bash(dir \"C:\\\\Users\\\\JarHead\\\\Documents\\\\GitHub\\\\SmashNotes-reactnative\\\\.env*\")",
+      "WebFetch(domain:www.supermajor.gg)",
+      "WebFetch(domain:smashgg-schema.netlify.app)",
+      "Bash(ls -la /c/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/server/*.js)"
     ]
   }
 }

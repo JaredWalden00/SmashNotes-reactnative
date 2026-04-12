@@ -42,6 +42,11 @@ export default function VodReviewTab({ allNotes, pendingVodNote, onClearPendingV
   const [layout, setLayout] = useState("side");
   const [showPrevious, setShowPrevious] = useState(false);
   const [browsing, setBrowsing] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [showAiUpload, setShowAiUpload] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null); // { dataUrl, base64, mediaType }
+  const fileInputRef = useRef(null);
   const { width } = useWindowDimensions();
 
   // Auto-load a pending VOD note when navigating from another tab
@@ -146,6 +151,105 @@ export default function VodReviewTab({ allNotes, pendingVodNote, onClearPendingV
     setNoteTitle("");
     setNoteContent("");
     setEditingNoteId(null);
+  }
+
+  // --- AI Frame Analysis ---
+  function processImageFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      // Resize image to max 1280px width to keep payload small
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxWidth = 1280;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        const resizedDataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const base64 = resizedDataUrl.split(",")[1];
+        setPreviewImage({ dataUrl: resizedDataUrl, base64, mediaType: "image/jpeg" });
+        setAiError(null);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleAiPaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (blob) processImageFile(blob);
+        return;
+      }
+    }
+  }
+
+  function handleAiFileSelect(e) {
+    const file = e.target.files?.[0];
+    if (file) processImageFile(file);
+  }
+
+  async function handleAnalyzeFrame() {
+    if (!previewImage) return;
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      // Use Vercel API route on deployed, localhost on dev
+      const hostname = typeof window !== "undefined" ? window.location.hostname : "localhost";
+      const isDeployed = hostname && hostname !== "localhost" && hostname !== "127.0.0.1" && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname);
+      const apiUrl = isDeployed
+        ? `${window.location.origin}/api/claude-analyze`
+        : `http://${hostname}:3001/api/claude-analyze`;
+
+      const resp = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: previewImage.base64,
+          mediaType: previewImage.mediaType,
+        }),
+      });
+      const data = await resp.json();
+
+      if (data.error) {
+        setAiError(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+        return;
+      }
+
+      // Insert analysis into the editor as a styled HTML block
+      const analysisHtml = `<div style="border-left:3px solid #6B9CFF;padding:8px 12px;margin:8px 0;background:#141C2B;border-radius:0 8px 8px 0;font-size:13px;line-height:1.6;"><div style="color:#6B9CFF;font-weight:800;font-size:11px;margin-bottom:4px;">AI FRAME ANALYSIS</div><div style="color:#D6E0F5;">${data.analysis}</div></div><p><br></p>`;
+
+      try {
+        const editorEl = document.querySelector(".live-editor");
+        if (editorEl) {
+          editorEl.focus();
+          document.execCommand("insertHTML", false, analysisHtml);
+          editorEl.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      } catch (e) {
+        // Fallback: append to content
+        setNoteContent((prev) => (prev || "") + analysisHtml);
+      }
+
+      // Auto-close the upload zone
+      setShowAiUpload(false);
+      setPreviewImage(null);
+    } catch (err) {
+      setAiError(err.message || "Failed to analyze");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   function handleBrowse() {
@@ -396,14 +500,85 @@ export default function VodReviewTab({ allNotes, pendingVodNote, onClearPendingV
               style={styles.noteTitleInput}
               value={noteTitle}
               onChangeText={setNoteTitle}
-              placeholder="Note title..."
+              placeholder="Name this review (e.g., MkLeo vs Sparg0 GF, My pools run)..."
               placeholderTextColor="#637083"
               maxLength={80}
             />
             <Pressable style={styles.timestampBtn} onPress={insertTimestampManual}>
               <Text style={styles.timestampBtnLabel}>🕐 Timestamp</Text>
             </Pressable>
+            <Pressable
+              style={[styles.aiBtn, aiLoading && styles.aiBtnLoading]}
+              onPress={() => { setShowAiUpload(!showAiUpload); setAiError(null); }}
+              disabled={aiLoading}
+            >
+              <Text style={styles.aiBtnLabel}>{aiLoading ? "Analyzing..." : "🤖 AI Analyze"}</Text>
+            </Pressable>
           </View>
+          {/* AI Upload Zone */}
+          {showAiUpload && (
+            <div
+              onPaste={handleAiPaste}
+              tabIndex={0}
+              style={{
+                backgroundColor: "#0F1420",
+                border: "2px dashed #2A4D9B",
+                borderRadius: 10,
+                padding: 16,
+                marginBottom: 8,
+                outline: "none",
+                textAlign: "center",
+              }}
+            >
+              {previewImage ? (
+                <View style={styles.aiPreviewWrap}>
+                  <img
+                    src={previewImage.dataUrl}
+                    style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginBottom: 10 }}
+                    alt="Screenshot preview"
+                  />
+                  <View style={styles.aiPreviewActions}>
+                    <Pressable
+                      style={styles.aiClearBtn}
+                      onPress={() => setPreviewImage(null)}
+                    >
+                      <Text style={styles.aiClearBtnLabel}>Clear</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.aiAnalyzeConfirmBtn, aiLoading && { opacity: 0.5 }]}
+                      onPress={handleAnalyzeFrame}
+                      disabled={aiLoading}
+                    >
+                      <Text style={styles.aiAnalyzeConfirmLabel}>
+                        {aiLoading ? "Analyzing..." : "Analyze This Frame"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.aiDropZone}>
+                  <Text style={styles.aiDropTitle}>Paste or upload a screenshot</Text>
+                  <Text style={styles.aiDropHint}>Take a screenshot of the game and paste it here (Ctrl+V)</Text>
+                  <Pressable
+                    style={styles.aiUploadBtn}
+                    onPress={() => fileInputRef.current?.click()}
+                  >
+                    <Text style={styles.aiUploadBtnLabel}>Upload Image</Text>
+                  </Pressable>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={handleAiFileSelect}
+                  />
+                </View>
+              )}
+              {aiError && (
+                <Text style={styles.aiErrorText}>{aiError}</Text>
+              )}
+            </div>
+          )}
           <View style={styles.editorFlex}>
             <LiveTextEditor
               value={noteContent}
@@ -725,4 +900,42 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   rewatchBtnLabel: { color: "#fff", fontSize: 11, fontWeight: "700" },
+  // AI Analyze styles
+  aiBtn: {
+    backgroundColor: "#1E3254",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: "#2A4D9B",
+  },
+  aiBtnLoading: { opacity: 0.5 },
+  aiBtnLabel: { color: "#6B9CFF", fontSize: 12, fontWeight: "700" },
+  aiPreviewWrap: { alignItems: "center" },
+  aiPreviewActions: { flexDirection: "row", gap: 10 },
+  aiClearBtn: {
+    backgroundColor: "#2A3449",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  aiClearBtnLabel: { color: "#96A3BD", fontWeight: "700", fontSize: 13 },
+  aiAnalyzeConfirmBtn: {
+    backgroundColor: "#FF6B3D",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  aiAnalyzeConfirmLabel: { color: "#fff", fontWeight: "700", fontSize: 13 },
+  aiDropZone: { alignItems: "center", paddingVertical: 12 },
+  aiDropTitle: { color: "#F4F7FF", fontSize: 15, fontWeight: "700", marginBottom: 6 },
+  aiDropHint: { color: "#637083", fontSize: 12, marginBottom: 12 },
+  aiUploadBtn: {
+    backgroundColor: "#2A3449",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  aiUploadBtnLabel: { color: "#ECF2FF", fontWeight: "700", fontSize: 13 },
+  aiErrorText: { color: "#F87171", fontSize: 12, marginTop: 8 },
 });

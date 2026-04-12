@@ -40,6 +40,19 @@ export async function startggGraphQL(query, variables, accessToken) {
  * @param {string} accessToken
  * @returns {Promise<Array>} - Array of set nodes
  */
+/**
+ * Filter sets to only include singles matches (exclude doubles, side events, etc.)
+ */
+export function filterSinglesOnly(sets) {
+  return sets.filter((set) => {
+    const eventName = (set.event?.name || "").toLowerCase();
+    // Exclude doubles, crews, side events, non-Ultimate
+    if (/doubles|crew|squad|brawl|melee|64|smash\s*4|side\s*event|redemption/i.test(eventName)) return false;
+    // Include if it has "singles" or if the event name doesn't match any exclusion
+    return true;
+  });
+}
+
 export async function fetchRecentSets(playerId, accessToken) {
   const query = `
     query RecentSets($playerId: ID!) {
@@ -72,7 +85,8 @@ export async function fetchRecentSets(playerId, accessToken) {
     }
   `;
   const data = await startggGraphQL(query, { playerId }, accessToken);
-  const sets = data?.player?.sets?.nodes || [];
+  const allSets = data?.player?.sets?.nodes || [];
+  const sets = filterSinglesOnly(allSets);
   sets._playerGamerTag = data?.player?.gamerTag || null;
   return sets;
 }
@@ -117,11 +131,12 @@ export async function fetchSetsPage(playerId, accessToken, page = 1, perPage = 2
     }
   `;
   const data = await startggGraphQL(query, { playerId, perPage, page }, accessToken);
-  const sets = data?.player?.sets?.nodes || [];
+  const rawSets = data?.player?.sets?.nodes || [];
+  const sets = filterSinglesOnly(rawSets);
   return {
     sets,
     gamerTag: data?.player?.gamerTag || null,
-    hasMore: sets.length === perPage,
+    hasMore: rawSets.length === perPage,
   };
 }
 
@@ -171,7 +186,7 @@ export async function fetchRecentOpponents(playerId, accessToken) {
   `;
   const data = await startggGraphQL(query, { playerId }, accessToken);
   const playerGamerTag = data?.player?.gamerTag;
-  const sets = data?.player?.sets?.nodes || [];
+  const sets = filterSinglesOnly(data?.player?.sets?.nodes || []);
   const opponentMap = {};
   let orderIndex = 0;
 
@@ -257,7 +272,7 @@ export async function fetchRecentOpponents(playerId, accessToken) {
  */
 export async function fetchMostPlayedAgainst(playerId, accessToken) {
   const PAGE_SIZE = 20;
-  const MAX_SETS = 100;
+  const MAX_SETS = 300;
   const query = `
     query MostPlayedAgainst($playerId: ID!, $perPage: Int!, $page: Int!) {
       player(id: $playerId) {
@@ -292,10 +307,11 @@ export async function fetchMostPlayedAgainst(playerId, accessToken) {
   for (let page = 1; allSets.length < MAX_SETS; page++) {
     const data = await startggGraphQL(query, { playerId, perPage: PAGE_SIZE, page }, accessToken);
     if (!playerGamerTag) playerGamerTag = data?.player?.gamerTag;
-    const nodes = data?.player?.sets?.nodes || [];
-    if (nodes.length === 0) break;
+    const rawNodes = data?.player?.sets?.nodes || [];
+    if (rawNodes.length === 0) break;
+    const nodes = filterSinglesOnly(rawNodes);
     allSets = allSets.concat(nodes);
-    if (nodes.length < PAGE_SIZE) break;
+    if (rawNodes.length < PAGE_SIZE) break;
   }
 
   const sets = allSets.slice(0, MAX_SETS);
