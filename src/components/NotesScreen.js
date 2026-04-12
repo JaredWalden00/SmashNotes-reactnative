@@ -12,6 +12,7 @@ import PlayersTab from "./PlayersTab";
 import SettingsTab from "./SettingsTab";
 import VodReviewTab from "./VodReviewTab";
 import FrameDataTab from "./FrameDataTab";
+import NotesImportTab from "./NotesImportTab";
 import TournamentTab from "./TournamentTab";
 import UpcomingTournamentCard from "./UpcomingTournamentCard";
 import { matchesSmashNoteSearch } from "../utils/smashNoteModel";
@@ -195,6 +196,7 @@ export default function NotesScreen({
     { key: "stats", label: "Stats", icon: "stats-chart" },
     { key: "players", label: "Players", icon: "people" },
     { key: "vod-review", label: "VOD Review", icon: "videocam" },
+    { key: "notes-import", label: "AI Import", icon: "sparkles" },
     { key: "frame-data", label: "Frame Data", icon: "flash" },
     { key: "settings", label: "Settings", icon: "settings" },
   ];
@@ -391,6 +393,7 @@ export default function NotesScreen({
       { key: "stats", label: "Stats" },
       { key: "players", label: "Players" },
       { key: "vod-review", label: "VOD Review" },
+      { key: "notes-import", label: "AI Import" },
       { key: "frame-data", label: "Frame Data" },
     ];
     return (
@@ -522,6 +525,13 @@ export default function NotesScreen({
           onSaveInlineEdit={onSaveInlineEdit}
         />
       )}
+      {renderTabPage("notes-import", "AI Import",
+        <NotesImportTab
+          allNotes={allNotes}
+          onCreateNoteSilent={onCreateNoteSilent}
+          userMainCharacter={userMainCharacter}
+        />
+      )}
       {renderTabPage("frame-data", "Frame Data", <FrameDataTab />)}
       {renderTabPage("settings", "Settings",
         <SettingsTab
@@ -543,7 +553,7 @@ export default function NotesScreen({
   );
 
   // If a persistent tab is active and no character selected, show only persistent tabs
-  const persistentTabKeys = ["tournaments", "stats", "players", "vod-review", "frame-data", "settings"];
+  const persistentTabKeys = ["tournaments", "stats", "players", "vod-review", "notes-import", "frame-data", "settings"];
   if (persistentTabKeys.includes(activeNavSection) && !selectedCharacter) {
     return persistentTabs;
   }

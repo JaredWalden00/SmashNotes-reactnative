@@ -1,153 +1,57 @@
-// server.js
-const express = require('express');
-const bodyParser = require('body-parser');
-require('dotenv').config();
+export default async function handler(req, res) {
+  // CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-const app = express();
-const cors = require('cors');
-
-// Allow requests from local dev, Docker, and LAN (mobile)
-app.use(cors({
-  origin: true, // Reflect any origin — safe for dev since this is a local proxy
-  credentials: false,
-}));
-app.use(bodyParser.json());
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Start.gg OAuth token exchange
-app.post('/api/startgg/exchange', async (req, res) => {
-  const { code, redirect_uri, code_verifier, client_id } = req.body;
-
-  // Pick the right client credentials based on which OAuth app was used
-  const mobileClientId = process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID;
-  const isMobile = client_id === mobileClientId || (redirect_uri && !redirect_uri.includes('localhost'));
-
-  const useClientId = isMobile
-    ? (process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID || process.env.EXPO_PUBLIC_START_GG_CLIENT_ID)
-    : process.env.EXPO_PUBLIC_START_GG_CLIENT_ID;
-  const useClientSecret = isMobile
-    ? (process.env.START_GG_MOBILE_CLIENT_SECRET || process.env.START_GG_CLIENT_SECRET)
-    : process.env.START_GG_CLIENT_SECRET;
-
-  try {
-    const response = await fetch('https://api.start.gg/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: useClientId,
-        client_secret: useClientSecret,
-        code,
-        redirect_uri,
-        code_verifier,
-        scope: 'user.identity user.email'
-      }),
-    });
-    const data = await response.json();
-    if (data.access_token) {
-      res.json(data);
-    } else {
-      res.status(400).json({ error: data });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Temporary token storage for native OAuth flow
-let pendingNativeToken = null;
-let pendingNativeTokenExpiry = 0;
-
-// Native OAuth callback — browser redirects here, exchanges code, stores token for native app to pick up
-app.get('/auth/native/callback', async (req, res) => {
-  const { code } = req.query;
-  if (!code) return res.status(400).send('Missing code');
-
-  const clientId = process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID || process.env.EXPO_PUBLIC_START_GG_CLIENT_ID;
-  const clientSecret = process.env.START_GG_MOBILE_CLIENT_SECRET || process.env.START_GG_CLIENT_SECRET;
-  // Use the Host header to match exactly what the browser used
-  const host = req.headers.host || `${req.hostname}:3001`;
-  const redirectUri = `http://${host}/auth/native/callback`;
-
-  console.log('[Native OAuth] Code received');
-  console.log('[Native OAuth] Client ID:', clientId);
-  console.log('[Native OAuth] Redirect URI:', redirectUri);
-
-  try {
-    const response = await fetch('https://api.start.gg/oauth/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: redirectUri,
-      }),
-    });
-    const data = await response.json();
-    console.log('[Native OAuth] Token response:', data.access_token ? 'SUCCESS' : JSON.stringify(data));
-    if (data.access_token) {
-      pendingNativeToken = data;
-      pendingNativeTokenExpiry = Date.now() + 120000; // 2 min expiry
-      res.send('<html><body style="background:#0F1420;color:#F4F7FF;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column"><h1 style="color:#34D399">Connected!</h1><p>You can close this window and return to SmashNotes.</p></body></html>');
-    } else {
-      res.status(400).send(`<html><body style="background:#0F1420;color:#F87171;font-family:sans-serif;padding:40px"><h1>Auth Failed</h1><pre>${JSON.stringify(data, null, 2)}</pre></body></html>`);
-    }
-  } catch (err) {
-    res.status(500).send(`<html><body style="background:#0F1420;color:#F87171;font-family:sans-serif;padding:40px"><h1>Error</h1><p>${err.message}</p></body></html>`);
-  }
-});
-
-// Native app polls this to pick up the token after browser auth
-app.get('/auth/native/token', (req, res) => {
-  if (pendingNativeToken && Date.now() < pendingNativeTokenExpiry) {
-    const token = pendingNativeToken;
-    pendingNativeToken = null; // One-time use
-    res.json(token);
-  } else {
-    res.json({ pending: true });
-  }
-});
-
-// Clean Discord copy-paste noise before sending to the model
-function cleanDiscordText(raw) {
-  return raw
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
-      if (!line) return false;
-      if (/^:(thumbsup|fire|sob|heart|eyes|100):$/i.test(line)) return false;
-      if (/^(Click to react|Add Reaction|Edit|Forward|More|Delete|Download)$/i.test(line)) return false;
-      if (/^Image(?: failed to load\.?)?$/i.test(line)) return false;
-      if (/^\[?\d{1,2}:\d{2}\s*(AM|PM)\]?\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i.test(line)) return false;
-      if (/^https?:\/\/\S+$/i.test(line)) return false;
-      if (/^(Twitter|YouTube)•/i.test(line)) return false;
-      if (/^Likes$/i.test(line)) return false;
-      if (/^\d+$/.test(line)) return false;
-      if (/^Edit Channel$/i.test(line)) return false;
-      if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/i.test(line)) return false;
-      return true;
-    })
-    .map(line => {
-      line = line.replace(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}\s*\d{1,2}:\d{2}\s*(?:AM|PM)/i, '$1');
-      line = line.replace(/\s*\(edited\)\s*/gi, ' ').trim();
-      return line;
-    })
-    .filter(line => line.length > 0)
-    .join('\n');
-}
-
-// Ollama AI notes categorization
-app.post('/api/claude-categorize', async (req, res) => {
   const { text, myCharacter } = req.body;
 
   if (!text || !text.trim()) {
     return res.status(400).json({ error: 'No text provided' });
+  }
+
+  // Clean Discord copy-paste noise before sending to the model
+  function cleanDiscordText(raw) {
+    return raw
+      .split('\n')
+      .map(line => line.trim())
+      // Remove Discord UI artifacts
+      .filter(line => {
+        if (!line) return false;
+        // Emoji reactions and UI buttons
+        if (/^:(thumbsup|fire|sob|heart|eyes|100):$/i.test(line)) return false;
+        if (/^(Click to react|Add Reaction|Edit|Forward|More|Delete|Download)$/i.test(line)) return false;
+        // "Image failed to load" or standalone "Image"
+        if (/^Image(?: failed to load\.?)?$/i.test(line)) return false;
+        // Bare timestamps like "[2:50 PM]Thursday, August 8, 2024 2:50 PM"
+        if (/^\[?\d{1,2}:\d{2}\s*(AM|PM)\]?\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i.test(line)) return false;
+        // Duplicate long-form timestamps appended to usernames: "TrueDingus — 1/2/2023 1:48 PMMonday, January 2, 2023 1:48 PM"
+        // Clean these to just "TrueDingus — 1/2/2023 1:48 PM"
+        // (handled below in transform, keep line)
+        // Pure URLs with no surrounding text
+        if (/^https?:\/\/\S+$/i.test(line)) return false;
+        // Twitter/YouTube embeds metadata
+        if (/^(Twitter|YouTube)•/i.test(line)) return false;
+        if (/^Likes$/i.test(line)) return false;
+        if (/^\d+$/.test(line)) return false; // bare numbers (like counts)
+        // "Edit Channel"
+        if (/^Edit Channel$/i.test(line)) return false;
+        // Bare month/date headers "January 2, 2023", "August 8, 2024"
+        if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/i.test(line)) return false;
+        return true;
+      })
+      .map(line => {
+        // Clean duplicate timestamps from username lines
+        // "TrueDingus — 1/2/2023 1:48 PMMonday, January 2, 2023 1:48 PM" -> "TrueDingus — 1/2/2023 1:48 PM"
+        line = line.replace(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}\s*\d{1,2}:\d{2}\s*(?:AM|PM)/i, '$1');
+        // Remove "(edited)" markers
+        line = line.replace(/\s*\(edited\)\s*/gi, ' ').trim();
+        return line;
+      })
+      .filter(line => line.length > 0)
+      .join('\n');
   }
 
   const cleanedText = cleanDiscordText(text);
@@ -243,10 +147,12 @@ Return ONLY valid JSON. No markdown. No code fences. No explanation.`;
     const data = await response.json();
     const rawContent = data.message?.content || '';
 
+    // Parse the JSON response
     let parsed;
     try {
       parsed = JSON.parse(rawContent);
     } catch (parseErr) {
+      // Try to extract JSON from the response if it has extra text or markdown fences
       const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         try {
@@ -278,10 +184,12 @@ Return ONLY valid JSON. No markdown. No code fences. No explanation.`;
         if (!merged[key]) {
           merged[key] = { opponent: note.opponent, sections: { ...note.sections } };
         } else {
+          // Append each section's content
           for (const [sectionKey, content] of Object.entries(note.sections || {})) {
             if (!content || !content.trim()) continue;
             const existing = merged[key].sections[sectionKey] || '';
             if (existing) {
+              // Avoid appending exact duplicates
               const existingLines = new Set(existing.split('\n').map(l => l.trim().toLowerCase()));
               const newLines = content.split('\n').filter(l =>
                 l.trim() && !existingLines.has(l.trim().toLowerCase())
@@ -308,7 +216,4 @@ Return ONLY valid JSON. No markdown. No code fences. No explanation.`;
         : (err.message || 'Failed to categorize notes')
     });
   }
-});
-
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
+}
