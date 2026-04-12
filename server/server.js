@@ -11,7 +11,7 @@ app.use(cors({
   origin: true, // Reflect any origin — safe for dev since this is a local proxy
   credentials: false,
 }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -111,6 +111,72 @@ app.get('/auth/native/token', (req, res) => {
     res.json(token);
   } else {
     res.json({ pending: true });
+  }
+});
+
+// Claude Vision API — AI frame analysis for VOD review
+app.post('/api/claude-analyze', async (req, res) => {
+  const { imageBase64, mediaType, context } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'No image provided' });
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in server/.env' });
+
+  let prompt = `You are analyzing a Super Smash Bros. Ultimate game screenshot. Provide a detailed analysis:
+
+**Game State:**
+- Read the exact damage percentages for each player (P1 left, P2 right)
+- Report stocks remaining for each player
+- Identify the characters being played if visible
+- Identify the stage if recognizable
+
+**Positioning:**
+- Where is each player on stage? (center, ledge, offstage, platform, above)
+- Who has stage control?
+- Current state? (neutral, advantage, disadvantage, edgeguard, recovery, combo)
+
+**Tactical Notes:**
+- What options does each player have?
+- Is anyone in kill percent range?
+- Notable observations?
+
+Use concise bullet points with HTML bold tags for key terms. Under 200 words.`;
+
+  if (context?.characterPlayed) prompt += `\n\nThe user plays ${context.characterPlayed}.`;
+  if (context?.opponent) prompt += ` Their opponent plays ${context.opponent}.`;
+
+  try {
+    console.log('[Claude] Analyzing frame...');
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+      }),
+    });
+    const data = await response.json();
+    if (data.error) {
+      console.error('[Claude] API error:', data.error);
+      return res.status(400).json({ error: data.error.message || 'Claude API error' });
+    }
+    const analysisText = data.content?.[0]?.text || 'No analysis generated';
+    console.log('[Claude] Analysis complete');
+    return res.json({ analysis: analysisText });
+  } catch (err) {
+    console.error('[Claude] Request failed:', err);
+    return res.status(500).json({ error: err.message });
   }
 });
 

@@ -263,14 +263,15 @@ function looksLikeAppHtml(html) {
   );
 }
 
-function getEditorStyles(isDark) {
-  const fg = isDark ? "#ECF2FF" : "#1A2B48";
-  const placeholder = isDark ? "#5A6B84" : "#A0AABB";
-  const codeBg = isDark ? "#1B2333" : "#F0F2F6";
-  const borderColor = isDark ? "#344158" : "#D8DDE5";
-  const quoteBorder = isDark ? "#4A5D7F" : "#D0D8E6";
-  const quoteColor = isDark ? "#8A93A7" : "#5A6B84";
-  const linkColor = isDark ? "#6B9CFF" : "#2A4D9B";
+function getEditorStyles() {
+  // Always use dark theme colors since the app is dark-themed
+  const fg = "#ECF2FF";
+  const placeholder = "#5A6B84";
+  const codeBg = "#1B2333";
+  const borderColor = "#344158";
+  const quoteBorder = "#4A5D7F";
+  const quoteColor = "#8A93A7";
+  const linkColor = "#6B9CFF";
 
   return `
     [data-placeholder]:empty::before {
@@ -450,7 +451,7 @@ export default function LiveTextEditor({
       styleRef.current = document.createElement("style");
       el.parentNode.insertBefore(styleRef.current, el);
     }
-    styleRef.current.textContent = getEditorStyles(isDark);
+    styleRef.current.textContent = getEditorStyles();
   }, [isDark]);
 
   // Set initial content

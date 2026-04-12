@@ -57,16 +57,13 @@ export class StartGGAuth {
       }
       this.isNative = false;
       console.log(`OAuth Config (Web ${isLocalhost ? 'Desktop' : isLAN ? 'LAN' : 'Deployed'}):`);
-      console.log('- hostname:', hostname);
-      console.log('- origin:', origin);
-      console.log('- isLocalhost:', isLocalhost);
-      console.log('- isLAN:', isLAN);
     }
 
     console.log('- Client ID:', this.clientId);
     console.log('- Redirect URI:', this.redirectUri);
-    console.log('- EXPO_PUBLIC_START_GG_PROD_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_PROD_CLIENT_ID);
-    console.log('- EXPO_PUBLIC_START_GG_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_CLIENT_ID);
+    console.log('- ENV CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_CLIENT_ID);
+    console.log('- ENV PROD_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_PROD_CLIENT_ID);
+    console.log('- ENV MOBILE_CLIENT_ID:', process.env.EXPO_PUBLIC_START_GG_MOBILE_CLIENT_ID);
   }
 
   // Return config object for useAuthRequest
