@@ -2,6 +2,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 require('dotenv').config();
+const { runAgentPipeline } = require('./agentCoordinator');
 
 const app = express();
 const cors = require('cors');
@@ -11,7 +12,7 @@ app.use(cors({
   origin: true, // Reflect any origin — safe for dev since this is a local proxy
   credentials: false,
 }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '10mb' }));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -114,198 +115,103 @@ app.get('/auth/native/token', (req, res) => {
   }
 });
 
-// Clean Discord copy-paste noise before sending to the model
-function cleanDiscordText(raw) {
-  return raw
-    .split('\n')
-    .map(line => line.trim())
-    .filter(line => {
-      if (!line) return false;
-      if (/^:(thumbsup|fire|sob|heart|eyes|100):$/i.test(line)) return false;
-      if (/^(Click to react|Add Reaction|Edit|Forward|More|Delete|Download)$/i.test(line)) return false;
-      if (/^Image(?: failed to load\.?)?$/i.test(line)) return false;
-      if (/^\[?\d{1,2}:\d{2}\s*(AM|PM)\]?\s*(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)/i.test(line)) return false;
-      if (/^https?:\/\/\S+$/i.test(line)) return false;
-      if (/^(Twitter|YouTube)•/i.test(line)) return false;
-      if (/^Likes$/i.test(line)) return false;
-      if (/^\d+$/.test(line)) return false;
-      if (/^Edit Channel$/i.test(line)) return false;
-      if (/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4}$/i.test(line)) return false;
-      return true;
-    })
-    .map(line => {
-      line = line.replace(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday),\s*(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s*\d{4}\s*\d{1,2}:\d{2}\s*(?:AM|PM)/i, '$1');
-      line = line.replace(/\s*\(edited\)\s*/gi, ' ').trim();
-      return line;
-    })
-    .filter(line => line.length > 0)
-    .join('\n');
-}
+// Claude Vision API — AI frame analysis for VOD review
+app.post('/api/claude-analyze', async (req, res) => {
+  const { imageBase64, mediaType, context } = req.body;
+  if (!imageBase64) return res.status(400).json({ error: 'No image provided' });
 
-// Ollama AI notes categorization
-app.post('/api/claude-categorize', async (req, res) => {
-  const { text, myCharacter } = req.body;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not set in server/.env' });
 
-  if (!text || !text.trim()) {
-    return res.status(400).json({ error: 'No text provided' });
+  let prompt = `You are analyzing a Super Smash Bros. Ultimate game screenshot. Provide a detailed analysis:
+
+**Game State:**
+- Read the exact damage percentages for each player (P1 left, P2 right)
+- Report stocks remaining for each player
+- Identify the characters being played if visible
+- Identify the stage if recognizable
+
+**Positioning:**
+- Where is each player on stage? (center, ledge, offstage, platform, above)
+- Who has stage control?
+- Current state? (neutral, advantage, disadvantage, edgeguard, recovery, combo)
+
+**Tactical Notes:**
+- What options does each player have?
+- Is anyone in kill percent range?
+- Notable observations?
+
+Use concise bullet points with HTML bold tags for key terms. Under 200 words.`;
+
+  if (context?.characterPlayed) prompt += `\n\nThe user plays ${context.characterPlayed}.`;
+  if (context?.opponent) prompt += ` Their opponent plays ${context.opponent}.`;
+
+  try {
+    console.log('[Claude] Analyzing frame...');
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: imageBase64 } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+      }),
+    });
+    const data = await response.json();
+    if (data.error) {
+      console.error('[Claude] API error:', data.error);
+      return res.status(400).json({ error: data.error.message || 'Claude API error' });
+    }
+    const analysisText = data.content?.[0]?.text || 'No analysis generated';
+    console.log('[Claude] Analysis complete');
+    return res.json({ analysis: analysisText });
+  } catch (err) {
+    console.error('[Claude] Request failed:', err);
+    return res.status(500).json({ error: err.message });
   }
+});
 
-  const cleanedText = cleanDiscordText(text);
+// Multi-agent Smash AI assistant
+app.post('/api/smash-ask', async (req, res) => {
+  const { question, myCharacter, userNotes } = req.body;
+
+  if (!question || !question.trim()) {
+    return res.status(400).json({ error: 'No question provided' });
+  }
 
   const OLLAMA_BASE = process.env.OLLAMA_URL || 'http://localhost:11434';
   const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'smashnotes';
 
-  const VALID_FIGHTERS = [
-    "Banjo & Kazooie","Bayonetta","Bowser","Bowser Jr","Byleth","Captain Falcon",
-    "Charizard","Chrom","Cloud","Corrin","Daisy","Dark Pit","Dark Samus",
-    "Diddy Kong","Donkey Kong","Dr. Mario","Duck Hunt","Falco","Fox","Ganondorf",
-    "Greninja","Hero","Ice Climbers","Ike","Incineroar","Inkling","Isabelle",
-    "Ivysaur","Jigglypuff","Joker","Kazuya","Ken","King Dedede","King K. Rool",
-    "Kirby","Link","Little Mac","Lucario","Lucas","Lucina","Luigi","Mario",
-    "Marth","Mega Man","Meta Knight","Mewtwo","Mii Brawler","Mii Gunner",
-    "Mii Swordfighter","Min Min","Mr. Game & Watch","Ness","Olimar","Pac-Man",
-    "Palutena","Peach","Pichu","Pikachu","Piranha Plant","Pit","Pokemon Trainer",
-    "Pyra/Mythra","R.O.B.","Richter","Ridley","Robin","Rosalina & Luma","Roy",
-    "Ryu","Samus","Sephiroth","Sheik","Shulk","Simon","Snake","Sonic","Sora",
-    "Squirtle","Steve","Terry","Toon Link","Villager","Wario","Wii Fit Trainer",
-    "Wolf","Yoshi","Young Link","Zelda","Zero Suit Samus"
-  ];
-
-  const systemPrompt = `You organize Super Smash Bros. Ultimate gameplay notes into JSON.
-
-The user plays: ${myCharacter || "unknown"}
-The user does NOT play as the opponent. The "opponent" field is who they are fighting AGAINST, NOT their own character.
-
-STEP 1: IDENTIFY OPPONENTS
-The text contains sections separated by channel headers like "the #fox channel" or "the #steve channel" or "#mythra channel".
-The channel name IS the opponent character. Map it to the closest match from this list:
-${VALID_FIGHTERS.join(", ")}
-
-IMPORTANT MAPPINGS:
-- #mythra or #pyra -> "Pyra/Mythra"
-- #fox -> "Fox"
-- #steve -> "Steve"
-- #chrom -> "Chrom"
-- #dk or #donkey kong -> "Donkey Kong"
-The opponent CAN be "${myCharacter}" (mirror match). Identify opponents from channel names, not from the user's character.
-
-STEP 2: GROUP ALL NOTES BY OPPONENT
-All notes under a channel header belong to that ONE opponent. Create exactly ONE object per opponent.
-Do NOT split one opponent's notes into multiple objects.
-
-STEP 3: CATEGORIZE EACH NOTE into one section:
-- "overview": General game plan, mindset, high-level strategy
-- "neutral": Spacing, approach, whiff punishing, grounded interactions, anti-air, movement
-- "advantage": Combos, juggles, edgeguards, ledgetrapping, kill confirms, tech chases, offstage
-- "disadvantage": Landing, recovery, escaping pressure, defensive options
-- "stageNotes": Stage-specific tips, platform play
-- "reminders": Quick reminders, habits to break, mental notes
-
-STEP 4: DEDUPLICATE — if the same note appears twice, include it only once.
-
-STEP 5: FORMAT each note as a bullet starting with "- ". Combine all notes in a section with newlines.
-
-Skip empty messages, links/URLs, images, and tweets — only include actual gameplay tips.
-
-EXAMPLE:
-If input has "#fox channel" with notes about combos and spacing, and "#mario channel" with notes about edgeguarding:
-
-{"notes":[{"opponent":"Fox","sections":{"overview":"","neutral":"- spacing note here","advantage":"- combo note here","disadvantage":"","stageNotes":"","reminders":""}},{"opponent":"Mario","sections":{"overview":"","neutral":"","advantage":"- edgeguard note here","disadvantage":"","stageNotes":"","reminders":""}}]}
-
-Return ONLY valid JSON. No markdown. No code fences. No explanation.`;
-
   try {
-    const response = await fetch(`${OLLAMA_BASE}/api/chat`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL,
-        stream: false,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Here are the raw notes to categorize:\n\n${cleanedText}` },
-        ],
-        options: {
-          temperature: 0.3,
-          num_predict: 4096,
-        },
-      }),
+    // Run the full multi-agent pipeline:
+    // 1. Coordinator AI picks which agents to use
+    // 2. Each agent runs independently with its own Ollama call
+    // 3. Synthesizer combines all agent outputs into one answer
+    const result = await runAgentPipeline(question, myCharacter, userNotes, OLLAMA_BASE, OLLAMA_MODEL);
+
+    return res.status(200).json({
+      answer: result.answer,
+      characters: result.characters,
+      agents: result.agents,
+      steps: result.steps,
     });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error('Ollama error:', response.status, errText);
-      return res.status(502).json({
-        error: `Ollama returned ${response.status}. Is Ollama running with the ${OLLAMA_MODEL} model pulled?`
-      });
-    }
-
-    const data = await response.json();
-    const rawContent = data.message?.content || '';
-
-    let parsed;
-    try {
-      parsed = JSON.parse(rawContent);
-    } catch (parseErr) {
-      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch[0]);
-        } catch {
-          // fall through
-        }
-      }
-      if (!parsed) {
-        console.error('Failed to parse Ollama response as JSON:', rawContent);
-        return res.status(500).json({ error: 'AI returned invalid format. Please try again.' });
-      }
-    }
-
-    // Post-process: clean up what the model returns
-    if (parsed.notes && Array.isArray(parsed.notes)) {
-      // 1. Filter out notes where opponent matches the user's own character
-      if (myCharacter) {
-        const myCharLower = myCharacter.toLowerCase();
-        parsed.notes = parsed.notes.filter(n =>
-          n.opponent && n.opponent.toLowerCase() !== myCharLower
-        );
-      }
-
-      // 2. Merge duplicate opponents into one
-      const merged = {};
-      for (const note of parsed.notes) {
-        const key = (note.opponent || '').toLowerCase();
-        if (!merged[key]) {
-          merged[key] = { opponent: note.opponent, sections: { ...note.sections } };
-        } else {
-          for (const [sectionKey, content] of Object.entries(note.sections || {})) {
-            if (!content || !content.trim()) continue;
-            const existing = merged[key].sections[sectionKey] || '';
-            if (existing) {
-              const existingLines = new Set(existing.split('\n').map(l => l.trim().toLowerCase()));
-              const newLines = content.split('\n').filter(l =>
-                l.trim() && !existingLines.has(l.trim().toLowerCase())
-              );
-              if (newLines.length) {
-                merged[key].sections[sectionKey] = existing + '\n' + newLines.join('\n');
-              }
-            } else {
-              merged[key].sections[sectionKey] = content;
-            }
-          }
-        }
-      }
-      parsed.notes = Object.values(merged);
-    }
-
-    return res.status(200).json(parsed);
   } catch (err) {
-    console.error('Ollama request failed:', err);
+    console.error('Agent pipeline failed:', err);
     const isConnectionError = err.code === 'ECONNREFUSED' || err.cause?.code === 'ECONNREFUSED';
     return res.status(500).json({
       error: isConnectionError
-        ? 'Cannot connect to Ollama. Make sure Ollama is running (ollama serve).'
-        : (err.message || 'Failed to categorize notes')
+        ? 'Cannot connect to Ollama. Make sure Ollama is running.'
+        : (err.message || 'Failed to generate answer')
     });
   }
 });

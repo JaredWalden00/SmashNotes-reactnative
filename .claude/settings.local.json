@@ -34,7 +34,19 @@
       "Bash(npm list:*)",
       "Bash(grep -l isDeployed dist/_expo/static/js/web/*.js)",
       "Bash(grep isDeployed dist/_expo/static/js/web/*.js)",
-      "Bash(grep startgg-exchange:*)"
+      "Bash(grep startgg-exchange:*)",
+      "Bash(findstr \"markdown\")",
+      "WebFetch(domain:www.ssbwiki.com)",
+      "Bash(node -e \"const fd = require\\('./src/data/frameData.json'\\); const bayo = fd['Bayonetta']; bayo.categories.forEach\\(c => { if \\(c.category === 'specialattacks'\\) c.moves.forEach\\(m => console.log\\(m.moveName, '|', m.startup\\)\\) }\\)\")",
+      "Bash(node -e \"const { getOOSOptions } = require\\('./server/frameDataQuery'\\); console.log\\(getOOSOptions\\('Bayonetta'\\)\\)\")",
+      "Bash(node -e \"const { getOOSOptions } = require\\('./server/frameDataQuery'\\); const out = getOOSOptions\\('Fox'\\); console.log\\(out.split\\('\\\\n'\\).slice\\(0,8\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(curl -s http://localhost:11434/api/show -d '{\"name\":\"smashnotes\"}')",
+      "Bash(node -e \"const d=[];process.stdin.on\\('data',c=>d.push\\(c\\)\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(Buffer.concat\\(d\\)\\);console.log\\('Template:', j.template?.substring\\(0,200\\)\\);console.log\\('Model:', j.modelinfo?.['general.architecture']\\)}\\)\")",
+      "Bash(curl -s http://localhost:11434/api/show -d '{\"name\":\"gemma3\"}')",
+      "Bash(node -e \"const d=[];process.stdin.on\\('data',c=>d.push\\(c\\)\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(Buffer.concat\\(d\\)\\);console.log\\('Has tools template:', j.template?.includes\\('tool'\\)\\);console.log\\('Parameters:', j.details?.parameter_size\\)}\\)\")",
+      "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"gemma3\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"test\",\"description\":\"test\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}}}}}],\"stream\":false}')",
+      "Bash(node -e \"const d=[];process.stdin.on\\('data',c=>d.push\\(c\\)\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(Buffer.concat\\(d\\)\\);console.log\\('Role:', j.message?.role\\);console.log\\('Tool calls:', JSON.stringify\\(j.message?.tool_calls\\)\\);console.log\\('Content:', j.message?.content?.substring\\(0,100\\)\\)}\\)\")",
+      "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"gemma3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 2+2?\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"calculator\",\"description\":\"Do math\",\"parameters\":{\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\",\"description\":\"math expression\"}}}}}],\"stream\":false}')"
     ]
   }
 }
