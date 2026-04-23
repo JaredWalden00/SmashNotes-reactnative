@@ -2,6 +2,8 @@
 
 A cross-platform companion app for competitive Super Smash Bros players — pairing personal matchup notes with live tournament and player data from the Start.gg API.
 
+🔗 **Live demo**: https://smashnotes-delta.vercel.app/
+
 ![SmashNotes Dashboard](images/Screenshot%202026-04-22%20210703.png)
 
 ## Why this exists
