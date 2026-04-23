@@ -1,27 +1,22 @@
-# SmashNotes (React Native)
+# SmashNotes
 
-A simple notes app built with React Native + Expo.
+A cross-platform companion app for competitive Super Smash Bros players — pairing personal matchup notes with live tournament and player data from the Start.gg API.
 
-Current app runtime:
-- Expo SDK 54
-- React Native 0.81
-- React 19.1
+![SmashNotes Dashboard](images/Screenshot%202026-04-22%20210703.png)
 
-## Features
+## Why this exists
 
-- Create notes
-- Edit existing notes
-- Delete notes
-- Email/password authentication with Supabase
-- Google sign-in with Supabase OAuth
-- Cloud sync across devices with Supabase Postgres
-- Offline cache per user with AsyncStorage
-- Search notes by title or content
-- **Start.gg Integration (Optional)**:
-  - Tournament search and bracket viewing
-  - Player lookup with tournament history
-  - Character usage analytics
-  - Auto-generated matchup notes from tournament data
+I coach a Smash player who needed a better way to track matchup notes, tournament results, and character usage than scattered Google Docs. SmashNotes pulls live tournament and player data from Start.gg directly into the notes layer, so matchup prep, player scouting, and post-tournament reflection all happen in one place.
+
+## How it's built
+
+I started this project in GitHub Copilot, then migrated to Claude partway through. Most of the codebase has been orchestrated through Claude since — I make the architectural calls (tech stack, data model, auth flow, offline-first strategy) and Claude handles implementation. React Native + Expo + Supabase was chosen for fast cross-platform shipping; Start.gg integration is what makes this more than a generic notes app.
+
+Currently building out AI agent integrations — partly with Claude, partly with local Gemma — to auto-generate matchup insights directly from tournament data.
+
+## Current state
+
+Running on PC and mobile. A handful of friends and a student I coach are actively using it. Active development — this is a live build, not a finished artifact.
 
 ## Getting Started
 
