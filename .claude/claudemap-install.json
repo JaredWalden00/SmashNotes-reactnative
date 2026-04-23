@@ -1,0 +1,25 @@
+{
+  "artifact": "claudemap",
+  "artifactVersion": "0.1.0",
+  "artifactRoot": "C:\\Users\\JarHead\\AppData\\Local\\npm-cache\\_npx\\706ea47e71616d11\\node_modules\\@quinnaho\\claudemap\\.npm-bundle\\claudemap",
+  "generatedAt": "2026-04-13T18:02:02.502Z",
+  "installedAt": "2026-04-16T11:38:26.776Z",
+  "managedPaths": [
+    ".claude/skills/claudemap-runtime",
+    ".claude/agents/claudemap-architect.md",
+    ".claude/commands/setup-claudemap.md",
+    ".claude/commands/open-claudemap.md",
+    ".claude/commands/refresh.md",
+    ".claude/commands/show.md",
+    ".claude/commands/explain.md",
+    ".claude/claudemap-install.json"
+  ],
+  "mode": "install",
+  "publicCommands": [
+    "setup-claudemap",
+    "open-claudemap",
+    "refresh",
+    "explain",
+    "show"
+  ]
+}

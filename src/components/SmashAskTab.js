@@ -119,7 +119,7 @@ export default function SmashAskTab({ allNotes, userMainCharacter }) {
             text: data.answer,
             characters: data.characters,
             agents: data.agents,
-            steps: data.steps,
+            provider: data.provider,
           },
         ]);
       }
@@ -279,21 +279,27 @@ export default function SmashAskTab({ allNotes, userMainCharacter }) {
                 {msg.text}
               </Text>
             )}
-            {(msg.agents || msg.characters) && (
+            {(msg.agents || msg.characters || msg.provider) && (
               <View style={styles.pipelineInfo}>
-                {msg.agents?.length > 0 && (
-                  <View style={styles.agentChips}>
-                    {msg.agents.map((a, i) => (
-                      <View key={i} style={styles.agentChip}>
-                        <Text style={styles.agentChipText}>{a}</Text>
-                      </View>
-                    ))}
-                  </View>
+                <View style={styles.agentChips}>
+                  {msg.provider && (
+                    <View style={[styles.agentChip, msg.provider === 'claude' ? styles.claudeChip : styles.ollamaChip]}>
+                      <Text style={[styles.agentChipText, msg.provider === 'claude' ? styles.claudeChipText : styles.ollamaChipText]}>
+                        {msg.provider === 'claude' ? 'Claude' : 'Ollama'}
+                      </Text>
+                    </View>
+                  )}
+                  {msg.agents?.length > 0 && msg.agents.map((a, i) => (
+                    <View key={i} style={styles.agentChip}>
+                      <Text style={styles.agentChipText}>{a}</Text>
+                    </View>
+                  ))}
+                </View>
+                {msg.characters?.length > 0 && (
+                  <Text style={styles.contextLabel}>
+                    {msg.characters.join(", ")}
+                  </Text>
                 )}
-                <Text style={styles.contextLabel}>
-                  {msg.steps?.length ? `${msg.steps.length} pipeline steps` : ""}
-                  {msg.characters?.length ? ` · ${msg.characters.join(", ")}` : ""}
-                </Text>
               </View>
             )}
           </View>
@@ -562,6 +568,18 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  claudeChip: {
+    backgroundColor: "rgba(107,156,255,0.15)",
+  },
+  claudeChipText: {
+    color: "#6B9CFF",
+  },
+  ollamaChip: {
+    backgroundColor: "rgba(167,139,250,0.15)",
+  },
+  ollamaChipText: {
+    color: "#A78BFA",
   },
   contextLabel: {
     color: "#637083",

@@ -1,0 +1,28 @@
+{
+  "graphRevision": 1,
+  "updatedAt": "2026-04-16T11:46:03.688Z",
+  "graphMeta": {
+    "repoName": "SmashNotes-reactnative",
+    "generatedAt": "2026-04-16T11:46:03.681Z",
+    "source": "claude",
+    "nodeCount": 155,
+    "edgeCount": 25,
+    "fileCount": 59
+  },
+  "runtime": {
+    "healthOverlay": false,
+    "highlightedNodeIds": [],
+    "highlightColor": "accent",
+    "focus": null,
+    "guidedFlow": null,
+    "presentation": {
+      "mode": "free",
+      "lockInput": false,
+      "title": null,
+      "explanation": null,
+      "body": null,
+      "stepLabel": null,
+      "updatedAt": null
+    }
+  }
+}

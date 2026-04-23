@@ -46,7 +46,13 @@
       "Bash(node -e \"const d=[];process.stdin.on\\('data',c=>d.push\\(c\\)\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(Buffer.concat\\(d\\)\\);console.log\\('Has tools template:', j.template?.includes\\('tool'\\)\\);console.log\\('Parameters:', j.details?.parameter_size\\)}\\)\")",
       "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"gemma3\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"test\",\"description\":\"test\",\"parameters\":{\"type\":\"object\",\"properties\":{\"x\":{\"type\":\"string\"}}}}}],\"stream\":false}')",
       "Bash(node -e \"const d=[];process.stdin.on\\('data',c=>d.push\\(c\\)\\);process.stdin.on\\('end',\\(\\)=>{const j=JSON.parse\\(Buffer.concat\\(d\\)\\);console.log\\('Role:', j.message?.role\\);console.log\\('Tool calls:', JSON.stringify\\(j.message?.tool_calls\\)\\);console.log\\('Content:', j.message?.content?.substring\\(0,100\\)\\)}\\)\")",
-      "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"gemma3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 2+2?\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"calculator\",\"description\":\"Do math\",\"parameters\":{\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\",\"description\":\"math expression\"}}}}}],\"stream\":false}')"
+      "Bash(curl -s http://localhost:11434/api/chat -d '{\"model\":\"gemma3\",\"messages\":[{\"role\":\"user\",\"content\":\"What is 2+2?\"}],\"tools\":[{\"type\":\"function\",\"function\":{\"name\":\"calculator\",\"description\":\"Do math\",\"parameters\":{\"type\":\"object\",\"properties\":{\"expression\":{\"type\":\"string\",\"description\":\"math expression\"}}}}}],\"stream\":false}')",
+      "Bash(curl -s -X POST http://localhost:3001/api/smash-ask -H \"Content-Type: application/json\" -d \"{\\\\\"question\\\\\":\\\\\"What is Fox's fastest move?\\\\\",\\\\\"myCharacter\\\\\":\\\\\"Bayonetta\\\\\"}\")",
+      "Bash(node -e ':*)",
+      "Bash(node -e \"require\\('dotenv'\\).config\\({ path: '.env' }\\); console.log\\('val:', JSON.stringify\\(process.env.ANTHROPIC_API_KEY\\)\\);\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const lines=fs.readFileSync\\('.env','utf8'\\).split\\('\\\\n'\\); lines.forEach\\(\\(l,i\\) => { if \\(l.includes\\('ANTHROPIC'\\)\\) console.log\\('Line', i, JSON.stringify\\(l\\)\\) }\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('Key:', process.env.ANTHROPIC_API_KEY?.substring\\(0, 20\\)\\);\")",
+      "Bash(node -e \"const r = require\\('dotenv'\\).config\\(\\); console.log\\('Error:', r.error\\); console.log\\('Keys:', Object.keys\\(r.parsed || {}\\).filter\\(k => k.includes\\('ANTHROPIC'\\)\\)\\); console.log\\('Val:', JSON.stringify\\(r.parsed?.ANTHROPIC_API_KEY?.substring\\(0,20\\)\\)\\)\")"
     ]
   }
 }

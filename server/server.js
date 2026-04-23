@@ -1,8 +1,8 @@
 // server.js
 const express = require('express');
 const bodyParser = require('body-parser');
-require('dotenv').config();
-const { runAgentPipeline } = require('./agentCoordinator');
+require('dotenv').config({ override: true });
+const { runClaudePipeline, runOllamaFallback } = require('./agentCoordinator');
 
 const app = express();
 const cors = require('cors');
@@ -181,7 +181,7 @@ Use concise bullet points with HTML bold tags for key terms. Under 200 words.`;
   }
 });
 
-// Multi-agent Smash AI assistant
+// AI assistant — Claude primary, Ollama fallback
 app.post('/api/smash-ask', async (req, res) => {
   const { question, myCharacter, userNotes } = req.body;
 
@@ -189,28 +189,68 @@ app.post('/api/smash-ask', async (req, res) => {
     return res.status(400).json({ error: 'No question provided' });
   }
 
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  // Try Claude first (if API key is available)
+  if (apiKey) {
+    try {
+      console.log('[SmashAsk] Using Claude API...');
+      const result = await runClaudePipeline(question, myCharacter, userNotes, apiKey);
+      console.log(`[SmashAsk] Claude responded. Tools used: ${result.tools.join(', ') || 'none'}. Loops: ${result.loops}`);
+
+      return res.status(200).json({
+        answer: result.answer,
+        characters: result.characters,
+        agents: result.tools,
+        provider: 'claude',
+      });
+    } catch (err) {
+      console.error('[SmashAsk] Claude failed, falling back to Ollama:', err.message);
+    }
+  }
+
+  // Ollama fallback
   const OLLAMA_BASE = process.env.OLLAMA_URL || 'http://localhost:11434';
   const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'smashnotes';
 
   try {
-    // Run the full multi-agent pipeline:
-    // 1. Coordinator AI picks which agents to use
-    // 2. Each agent runs independently with its own Ollama call
-    // 3. Synthesizer combines all agent outputs into one answer
-    const result = await runAgentPipeline(question, myCharacter, userNotes, OLLAMA_BASE, OLLAMA_MODEL);
+    console.log('[SmashAsk] Using Ollama fallback...');
+    const { systemPrompt, agents, characters } = runOllamaFallback(question, myCharacter, userNotes);
+
+    const response = await fetch(`${OLLAMA_BASE}/api/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL,
+        stream: false,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: question },
+        ],
+        options: { temperature: 0.2, num_predict: 1024 },
+      }),
+    });
+
+    if (!response.ok) {
+      return res.status(502).json({ error: `Ollama returned ${response.status}. Is Ollama running?` });
+    }
+
+    const data = await response.json();
+    let answer = data.message?.content || 'No response generated.';
+    answer = answer.replace(/^[^\w#*\-•>]+/, '').trim();
 
     return res.status(200).json({
-      answer: result.answer,
-      characters: result.characters,
-      agents: result.agents,
-      steps: result.steps,
+      answer,
+      characters,
+      agents,
+      provider: 'ollama',
     });
   } catch (err) {
-    console.error('Agent pipeline failed:', err);
+    console.error('[SmashAsk] Ollama also failed:', err);
     const isConnectionError = err.code === 'ECONNREFUSED' || err.cause?.code === 'ECONNREFUSED';
     return res.status(500).json({
       error: isConnectionError
-        ? 'Cannot connect to Ollama. Make sure Ollama is running.'
+        ? 'No AI available. Set ANTHROPIC_API_KEY for Claude, or start Ollama for local AI.'
         : (err.message || 'Failed to generate answer')
     });
   }
