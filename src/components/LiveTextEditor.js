@@ -656,6 +656,15 @@ export default function LiveTextEditor({
     if (!el) return;
     el.focus();
 
+    // Restore the highlight the user made before clicking the toolbar button —
+    // otherwise execCommand toggles formatting on a collapsed caret instead of
+    // the selected range, so Bold etc. silently does nothing.
+    if (savedSelectionRef.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelectionRef.current);
+    }
+
     if (cmd.startsWith("formatBlock-")) {
       const tag = cmd.split("-")[1];
       document.execCommand("formatBlock", false, tag);
@@ -694,6 +703,10 @@ export default function LiveTextEditor({
 
   return (
     <View style={[styles.container, isDark && styles.containerDark, style]}>
+      {/* preventDefault on mousedown keeps the editor's text selection alive
+          when toolbar buttons are clicked — without it, mousedown shifts focus
+          to the button and collapses the highlight before execCommand runs. */}
+      <div onMouseDown={(e) => e.preventDefault()}>
       {/* Toolbar */}
       <View style={[styles.toolbar, isDark && styles.toolbarDark, toolbarStyle]}>
         {TOOLBAR_ITEMS.map((item, index) => {
@@ -813,6 +826,7 @@ export default function LiveTextEditor({
           )}
         </View>
       </View>
+      </div>
 
       {/* Frame Data popup */}
       {fdOpen && (
