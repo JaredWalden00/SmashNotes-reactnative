@@ -507,13 +507,6 @@ export default function VodReviewTab({ allNotes, pendingVodNote, onClearPendingV
             <Pressable style={styles.timestampBtn} onPress={insertTimestampManual}>
               <Text style={styles.timestampBtnLabel}>🕐 Timestamp</Text>
             </Pressable>
-            <Pressable
-              style={[styles.aiBtn, aiLoading && styles.aiBtnLoading]}
-              onPress={() => { setShowAiUpload(!showAiUpload); setAiError(null); }}
-              disabled={aiLoading}
-            >
-              <Text style={styles.aiBtnLabel}>{aiLoading ? "Analyzing..." : "🤖 AI Analyze"}</Text>
-            </Pressable>
           </View>
           {/* AI Upload Zone */}
           {showAiUpload && (
