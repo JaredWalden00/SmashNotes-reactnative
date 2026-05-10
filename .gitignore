@@ -5,3 +5,10 @@ dist/
 .DS_Store
 .vercel
 .env*.local
+
+# Claude Code internal worktrees
+.claude/worktrees/
+
+# Move GIFs are local-only assets (not currently bundled or referenced).
+# If/when these are needed in the app, host externally (S3/CDN) or use Git LFS.
+data/move-gifs/
