@@ -9,6 +9,9 @@ dist/
 # Claude Code internal worktrees
 .claude/worktrees/
 
+# ClaudeMap runtime install (137 MB of node_modules, rebuilt on demand)
+.claude/skills/claudemap-runtime/
+
 # Move GIFs are local-only assets (not currently bundled or referenced).
 # If/when these are needed in the app, host externally (S3/CDN) or use Git LFS.
 data/move-gifs/

@@ -40,7 +40,8 @@
       "Bash(dir \"C:\\\\Users\\\\JarHead\\\\Documents\\\\GitHub\\\\SmashNotes-reactnative\\\\.env*\")",
       "WebFetch(domain:www.supermajor.gg)",
       "WebFetch(domain:smashgg-schema.netlify.app)",
-      "Bash(ls -la /c/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/server/*.js)"
+      "Bash(ls -la /c/Users/JarHead/Documents/GitHub/SmashNotes-reactnative/server/*.js)",
+      "Read(//c/Users/JarHead/.claude/plugins/**)"
     ]
   }
 }
